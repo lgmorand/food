@@ -1,0 +1,70 @@
+name: Déploiement FTP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploiement-ftp
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sqlite3, mbstring, fileinfo, gd
+          coverage: none
+
+      - name: Tests métier
+        run: php tests/run.php
+
+      - name: Tests HTTP
+        env:
+          FOOD_DB_PATH: ${{ runner.temp }}/food-ci.sqlite
+        run: |
+          php -S 127.0.0.1:8321 -t public public/index.php &
+          server_pid=$!
+          for i in $(seq 1 30); do
+            if curl -sS -o /dev/null http://127.0.0.1:8321/api/auth/me; then break; fi
+            sleep 1
+          done
+          status=0
+          php tests/http.php || status=$?
+          kill "$server_pid" || true
+          exit $status
+
+  deploy:
+    name: Publication FTP
+    needs: tests
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publier sur le serveur FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ vars.FTP_PORT || 21 }}
+          protocol: ${{ vars.FTP_PROTOCOL || 'ftps' }}
+          server-dir: ${{ vars.FTP_SERVER_DIR || './' }}
+          # Les fichiers créés par l'application (base SQLite, photos envoyées)
+          # ne sont pas dans le dépôt : ils ne sont ni transférés ni supprimés.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            tests/**
+            database/*.sqlite*
+            README.md
+            SPECS.md

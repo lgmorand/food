@@ -87,6 +87,36 @@ Le dossier `database/` doit être accessible en écriture par PHP, ainsi que
 `public/uploads/`. Servez l'application en HTTPS : le cookie de session est
 alors émis avec l'attribut `Secure`.
 
+### Publication automatique par FTP
+
+Le workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
+exécute les deux suites de tests puis téléverse le dépôt sur un serveur FTP à
+chaque push sur `main` (ou manuellement via « Run workflow »).
+
+Secrets à définir dans *Settings → Secrets and variables → Actions* :
+
+| Secret         | Rôle                          |
+|----------------|-------------------------------|
+| `FTP_SERVER`   | Hôte, par ex. `ftp.exemple.fr`|
+| `FTP_USERNAME` | Identifiant FTP               |
+| `FTP_PASSWORD` | Mot de passe FTP              |
+
+Variables optionnelles (onglet *Variables*) :
+
+| Variable          | Défaut | Rôle                                            |
+|-------------------|--------|-------------------------------------------------|
+| `FTP_PROTOCOL`    | `ftps` | `ftp`, `ftps` ou `ftps-legacy`                   |
+| `FTP_PORT`        | `21`   | Port du serveur                                  |
+| `FTP_SERVER_DIR`  | `./`   | Dossier cible, **avec barre oblique finale**     |
+
+Le transfert est incrémental : seuls les fichiers modifiés sont envoyés. La
+base SQLite et les photos envoyées par l'application ne sont ni transférées ni
+supprimées, tout comme les tests et la documentation.
+
+Si l'hébergeur n'autorise pas de pointer le domaine sur `public/`, renseignez
+`FTP_SERVER_DIR` avec le dossier parent du site et créez à la racine web un
+`index.php` qui inclut `public/index.php`.
+
 ## Organisation du code
 
 ```
