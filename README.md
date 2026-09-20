@@ -11,6 +11,16 @@ pour un foyer de deux personnes.
 
 Les spécifications fonctionnelles sont dans [SPECS.md](SPECS.md).
 
+## Aperçu
+
+| Proposer un menu | Ajuster les recettes |
+|:---:|:---:|
+| ![Écran d'accueil : choix de 5 ou 6 recettes et bouton de proposition](docs/screenshots/accueil.png) | ![Menu proposé : cartes de recettes avec verrou, remplacement et retrait](docs/screenshots/menu.png) |
+
+| Catalogue de recettes | Liste de courses |
+|:---:|:---:|
+| ![Liste des recettes du foyer avec recherche](docs/screenshots/recettes.png) | ![Liste de courses groupée par rayon, quantités agrégées et articles cochables](docs/screenshots/courses.png) |
+
 ## Pile technique
 
 | Élément  | Choix                                          |
@@ -123,6 +133,7 @@ Si l'hébergeur n'autorise pas de pointer le domaine sur `public/`, renseignez
 bootstrap.php          autoloader, constantes, fuseau horaire
 bin/seed.php           jeu de démonstration
 database/schema.sql    schéma SQLite
+docs/screenshots/      captures utilisées par le README
 public/                racine web : front controller, SPA, uploads
 src/Database.php       connexion PDO + migrations
 src/Auth.php           comptes, foyers, invitations

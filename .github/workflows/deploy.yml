@@ -65,6 +65,7 @@ jobs:
             **/.git*/**
             **/.github/**
             tests/**
+            docs/**
             database/*.sqlite*
             README.md
             SPECS.md
