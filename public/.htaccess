@@ -1,4 +1,5 @@
 # Toutes les requêtes non statiques passent par le front controller.
+# Utilisé lorsque la racine du site pointe directement sur ce dossier.
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond %{REQUEST_FILENAME} !-f
@@ -10,8 +11,3 @@
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
 </IfModule>
-
-# Les photos uploadées ne doivent jamais être exécutées.
-<Directory "uploads">
-    php_flag engine off
-</Directory>

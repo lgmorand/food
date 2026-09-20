@@ -1,0 +1,11 @@
+# Les photos envoyées par les utilisateurs ne doivent jamais être exécutées.
+# Volontairement limité aux directives autorisées partout (AllowOverride Limit).
+<FilesMatch "\.(php|phtml|phar|php3|php4|php5|php7|php8|cgi|pl|py|sh|html?)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
