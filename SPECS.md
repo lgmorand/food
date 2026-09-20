@@ -147,6 +147,10 @@ Contrainte : un ingrédient ne peut apparaître qu'une fois dans une recette.
     **non présentes** dans le menu courant.
   - S'il n'existe aucune recette de remplacement disponible, un message l'indique
     et la carte reste inchangée.
+  - « Retirer » supprime la recette de la carte et la remplace immédiatement par
+    un nouveau tirage au hasard parmi les recettes actives absentes du menu ;
+    si le catalogue est épuisé, la carte disparaît et le menu compte une recette
+    de moins.
 - Bouton « Verrouiller » (🔒) par carte : une recette verrouillée n'est pas
   modifiée par un « Tout regénérer ».
 - Bouton « Tout regénérer » : retire un nouveau tirage complet sauf cartes verrouillées.

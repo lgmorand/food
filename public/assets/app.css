@@ -1,0 +1,252 @@
+:root {
+    --green: #2f7a4f;
+    --green-dark: #23603d;
+    --green-light: #e8f4ec;
+    --orange: #e07a3f;
+    --red: #c0392b;
+    --ink: #1f2a24;
+    --muted: #6b7a72;
+    --line: #dde5e0;
+    --bg: #f6f8f6;
+    --card: #ffffff;
+    --radius: 14px;
+    --shadow: 0 2px 10px rgba(31, 42, 36, 0.08);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-text-size-adjust: 100%;
+}
+
+.app { min-height: 100vh; padding-bottom: calc(76px + var(--safe-bottom)); }
+
+.splash { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+.spinner {
+    width: 28px; height: 28px;
+    border: 3px solid var(--line);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- En-tête ---------- */
+.topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px;
+    background: var(--green);
+    color: #fff;
+    box-shadow: var(--shadow);
+}
+.topbar h1 { margin: 0; font-size: 1.15rem; font-weight: 600; flex: 1; }
+.topbar .subtitle { display: block; font-size: 0.78rem; opacity: 0.85; font-weight: 400; }
+.topbar button {
+    background: rgba(255, 255, 255, 0.18);
+    border: 0; color: #fff;
+    border-radius: 10px;
+    min-height: 40px; min-width: 44px;
+    padding: 0 12px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+/* ---------- Contenu ---------- */
+.screen { padding: 16px; max-width: 760px; margin: 0 auto; }
+.screen > h2 { margin: 4px 0 12px; font-size: 1.05rem; }
+
+.card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    margin-bottom: 14px;
+}
+
+.muted { color: var(--muted); font-size: 0.88rem; }
+.center { text-align: center; }
+.row { display: flex; gap: 10px; align-items: center; }
+.row.wrap { flex-wrap: wrap; }
+.spacer { flex: 1; }
+
+/* ---------- Boutons ---------- */
+button, .btn {
+    font: inherit;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    min-height: 46px;
+    padding: 0 16px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.btn-primary { background: var(--green); color: #fff; }
+.btn-primary:active { background: var(--green-dark); }
+.btn-secondary { background: #fff; color: var(--green); border-color: var(--green); }
+.btn-ghost { background: transparent; color: var(--muted); border-color: var(--line); }
+.btn-danger { background: #fff; color: var(--red); border-color: #f0c9c4; }
+.btn-block { width: 100%; }
+.btn-sm { min-height: 38px; padding: 0 12px; font-size: 0.85rem; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ---------- Formulaires ---------- */
+label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 4px; }
+input, select, textarea {
+    font: inherit;
+    width: 100%;
+    min-height: 46px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--ink);
+}
+input:focus, select:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+.field { margin-bottom: 12px; }
+.field-error { color: var(--red); font-size: 0.82rem; margin-top: 4px; }
+
+/* ---------- Segmented control ---------- */
+.segmented { display: flex; background: var(--green-light); border-radius: 12px; padding: 4px; gap: 4px; }
+.segmented button {
+    flex: 1; background: transparent; color: var(--green-dark);
+    min-height: 40px; border: 0; font-weight: 600;
+}
+.segmented button.active { background: #fff; box-shadow: var(--shadow); }
+
+/* ---------- Recettes ---------- */
+.recipe-list { display: grid; gap: 12px; }
+.recipe-row {
+    display: flex; gap: 12px; align-items: center;
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 10px; text-align: left;
+    width: 100%; border: 0; min-height: 76px;
+}
+.thumb {
+    width: 56px; height: 56px; border-radius: 12px;
+    background: var(--green-light) center/cover no-repeat;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; flex: 0 0 auto;
+}
+.recipe-row .name { font-weight: 600; }
+.badge {
+    font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
+    background: var(--green-light); color: var(--green-dark);
+}
+.badge.off { background: #f1f1f1; color: var(--muted); }
+
+.ingredient-line { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+.ingredient-line .grow { flex: 1 1 auto; min-width: 0; }
+.ingredient-line input[type="number"] { width: 84px; }
+.ingredient-line select { width: 122px; }
+.ingredient-line .remove {
+    min-height: 46px; min-width: 46px; padding: 0;
+    background: transparent; border: 0; color: var(--red); font-size: 1.2rem;
+}
+
+/* ---------- Menu ---------- */
+.menu-grid { display: grid; gap: 12px; }
+.menu-card {
+    display: flex; gap: 12px; align-items: center;
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 10px;
+}
+.menu-card.locked { outline: 2px solid var(--green); }
+.menu-card .actions { display: flex; gap: 4px; }
+.menu-card .icon-btn {
+    min-width: 44px; min-height: 44px; padding: 0;
+    background: var(--bg); border: 1px solid var(--line); font-size: 1.05rem;
+}
+.day-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.notice {
+    background: #fff5e8; border: 1px solid #f3d6b2; color: #8a5a20;
+    border-radius: 12px; padding: 10px 12px; font-size: 0.88rem; margin-bottom: 12px;
+}
+.notice.error { background: #fdecea; border-color: #f5c6c0; color: #8c2f24; }
+
+/* ---------- Liste de courses ---------- */
+.progress { height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; margin: 8px 0 4px; }
+.progress span { display: block; height: 100%; background: var(--green); transition: width 0.25s ease; }
+
+.group-title {
+    font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); margin: 18px 0 8px;
+}
+.shop-item {
+    display: flex; gap: 12px; align-items: center;
+    background: var(--card); border-radius: 12px; box-shadow: var(--shadow);
+    padding: 10px 12px; margin-bottom: 8px; min-height: 56px;
+}
+.shop-item.checked { opacity: 0.55; }
+.shop-item.checked .label { text-decoration: line-through; }
+.shop-item .check {
+    width: 26px; height: 26px; border-radius: 8px; flex: 0 0 auto;
+    border: 2px solid var(--green); background: #fff; padding: 0;
+    min-height: 26px; color: var(--green); font-size: 0.9rem;
+}
+.shop-item.checked .check { background: var(--green); color: #fff; }
+.shop-item .label { font-weight: 500; }
+.shop-item .qty { color: var(--green-dark); font-size: 0.85rem; }
+.shop-item .sources { color: var(--muted); font-size: 0.76rem; }
+.shop-item .trash { background: transparent; border: 0; color: var(--muted); min-width: 40px; padding: 0; }
+
+/* ---------- Navigation basse ---------- */
+.tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+    display: flex; background: #fff;
+    border-top: 1px solid var(--line);
+    padding-bottom: var(--safe-bottom);
+}
+.tabbar button {
+    flex: 1; background: transparent; border: 0; color: var(--muted);
+    font-size: 0.7rem; min-height: 62px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.tabbar button .ico { font-size: 1.3rem; }
+.tabbar button.active { color: var(--green); font-weight: 600; }
+
+/* ---------- Divers ---------- */
+.toast {
+    position: fixed; left: 50%; bottom: calc(86px + var(--safe-bottom));
+    transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: #fff;
+    padding: 10px 16px; border-radius: 999px; font-size: 0.88rem;
+    opacity: 0; pointer-events: none; transition: all 0.2s ease;
+    z-index: 50; max-width: 90vw; text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.error { background: var(--red); }
+
+.empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+.empty .ico { font-size: 2.4rem; display: block; margin-bottom: 8px; }
+
+.modal-backdrop {
+    position: fixed; inset: 0; background: rgba(15, 25, 20, 0.45);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 40;
+}
+.modal {
+    background: #fff; width: 100%; max-width: 560px;
+    border-radius: 18px 18px 0 0; padding: 18px;
+    max-height: 86vh; overflow-y: auto;
+}
+@media (min-width: 640px) {
+    .modal-backdrop { align-items: center; }
+    .modal { border-radius: 18px; }
+}
+
+.auth-wrap { max-width: 420px; margin: 0 auto; padding: 32px 16px; }
+.auth-wrap .logo { font-size: 3rem; text-align: center; }
+.link-btn { background: none; border: 0; color: var(--green); text-decoration: underline; min-height: 40px; }

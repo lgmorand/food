@@ -1,0 +1,12 @@
+# Base de données locale
+database/*.sqlite
+database/*.sqlite-wal
+database/*.sqlite-shm
+
+# Photos de recettes
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Divers
+.DS_Store
+Thumbs.db
