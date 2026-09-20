@@ -14,8 +14,21 @@ final class Request
         public readonly array $query,
         ?array $body = null,
         public readonly array $files = [],
+        public readonly string $basePath = '',
     ) {
         $this->body = $body ?? [];
+    }
+
+    /**
+     * Préfixe d'URL sous lequel l'application est publiée, sans barre oblique
+     * finale : vide à la racine du domaine, « /food » dans un sous-dossier.
+     */
+    public static function detectBasePath(): string
+    {
+        $script = $_SERVER['SCRIPT_NAME'] ?? '';
+        $base = rtrim(str_replace('\\', '/', dirname($script)), '/');
+
+        return $base === '/' ? '' : $base;
     }
 
     public static function fromGlobals(): self
@@ -23,6 +36,11 @@ final class Request
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
         $path = parse_url($uri, PHP_URL_PATH) ?: '/';
+
+        $basePath = self::detectBasePath();
+        if ($basePath !== '' && (str_starts_with($path, $basePath . '/') || $path === $basePath)) {
+            $path = substr($path, strlen($basePath)) ?: '/';
+        }
 
         $body = [];
         $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
@@ -34,7 +52,7 @@ final class Request
             $body = $_POST;
         }
 
-        return new self($method, rtrim($path, '/') ?: '/', $_GET, $body, $_FILES);
+        return new self($method, rtrim($path, '/') ?: '/', $_GET, $body, $_FILES, $basePath);
     }
 
     public function input(string $key, mixed $default = null): mixed

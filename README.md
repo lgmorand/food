@@ -79,9 +79,12 @@ php -S 127.0.0.1:8321 -t public public/index.php
 
 ## Déploiement
 
-La racine du site doit pointer sur `public/` ; tout ce qui n'est pas un fichier
-existant est routé vers `public/index.php` (une configuration Apache est fournie
-dans `public/.htaccess`).
+L'application fonctionne dans deux configurations.
+
+### 1. La racine du site pointe sur `public/` (recommandé)
+
+Tout ce qui n'est pas un fichier existant est routé vers `public/index.php`
+(configuration Apache fournie dans `public/.htaccess`).
 
 Exemple Nginx :
 
@@ -92,6 +95,21 @@ location / { try_files $uri /index.php$is_args$args; }
 location ~ \.php$ { fastcgi_pass unix:/run/php/php-fpm.sock; include fastcgi_params;
                     fastcgi_param SCRIPT_FILENAME $document_root/index.php; }
 ```
+
+### 2. Hébergement mutualisé, dans un sous-dossier
+
+Si vous ne pouvez pas déplacer la racine du site — par exemple un dossier
+`www/food` servi sous `https://exemple.fr/food` — téléversez le dépôt tel quel :
+l'`index.php` et le `.htaccess` présents à la racine du dépôt prennent le
+relais, servent `public/` et bloquent l'accès au code et à la base.
+
+Le préfixe d'URL est détecté automatiquement (`SCRIPT_NAME`) : la page injecte
+une balise `<base>`, et les appels d'API comme les photos restent relatifs. Le
+cookie de session est limité au sous-dossier.
+
+> Si votre hébergeur ignore les fichiers `.htaccess`, placez impérativement la
+> base hors du dossier web avec `FOOD_DB_PATH`, sinon elle serait
+> téléchargeable.
 
 Le dossier `database/` doit être accessible en écriture par PHP, ainsi que
 `public/uploads/`. Servez l'application en HTTPS : le cookie de session est
@@ -124,13 +142,14 @@ base SQLite et les photos envoyées par l'application ne sont ni transférées n
 supprimées, tout comme les tests et la documentation.
 
 Si l'hébergeur n'autorise pas de pointer le domaine sur `public/`, renseignez
-`FTP_SERVER_DIR` avec le dossier parent du site et créez à la racine web un
-`index.php` qui inclut `public/index.php`.
+`FTP_SERVER_DIR` avec le dossier cible (par exemple `./food/`) : la racine du
+dépôt contient déjà l'`index.php` et le `.htaccess` nécessaires.
 
 ## Organisation du code
 
 ```
 bootstrap.php          autoloader, constantes, fuseau horaire
+index.php, .htaccess   entrée de secours pour un hébergement en sous-dossier
 bin/seed.php           jeu de démonstration
 database/schema.sql    schéma SQLite
 docs/screenshots/      captures utilisées par le README

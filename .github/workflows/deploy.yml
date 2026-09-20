@@ -1,4 +1,4 @@
-name: Déploiement FTP
+﻿name: DÃ©ploiement FTP
 
 on:
   push:
@@ -14,7 +14,7 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Installer PHP
         uses: shivammathur/setup-php@v2
@@ -23,7 +23,7 @@ jobs:
           extensions: pdo_sqlite, sqlite3, mbstring, fileinfo, gd
           coverage: none
 
-      - name: Tests métier
+      - name: Tests mÃ©tier
         run: php tests/run.php
 
       - name: Tests HTTP
@@ -47,10 +47,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Publier sur le serveur FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
@@ -58,8 +58,8 @@ jobs:
           port: ${{ vars.FTP_PORT || 21 }}
           protocol: ${{ vars.FTP_PROTOCOL || 'ftps' }}
           server-dir: ${{ vars.FTP_SERVER_DIR || './' }}
-          # Les fichiers créés par l'application (base SQLite, photos envoyées)
-          # ne sont pas dans le dépôt : ils ne sont ni transférés ni supprimés.
+          # Les fichiers crÃ©Ã©s par l'application (base SQLite, photos envoyÃ©es)
+          # ne sont pas dans le dÃ©pÃ´t : ils ne sont ni transfÃ©rÃ©s ni supprimÃ©s.
           exclude: |
             **/.git*
             **/.git*/**

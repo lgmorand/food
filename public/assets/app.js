@@ -19,6 +19,15 @@
 
     /* ---------------------------------------------------------------- API */
 
+    // L'application peut être publiée dans un sous-dossier : toutes les URL
+    // sont résolues depuis <base href>, jamais depuis la racine du domaine.
+    const url = (relative) => {
+        const value = String(relative ?? '');
+        if (/^[a-z]+:\/\//i.test(value) || value.startsWith('data:')) return value;
+
+        return new URL(value.replace(/^\/+/, ''), document.baseURI).href;
+    };
+
     async function api(path, options = {}) {
         const opts = { credentials: 'same-origin', headers: {}, ...options };
         if (opts.body !== undefined && !(opts.body instanceof FormData)) {
@@ -31,7 +40,7 @@
         let res = null;
         for (let attempt = 1; attempt <= attempts; attempt += 1) {
             try {
-                res = await fetch('/api' + path, opts);
+                res = await fetch(url('api' + path), opts);
                 break;
             } catch (networkError) {
                 if (attempt === attempts) {
@@ -280,7 +289,7 @@
 
     function menuCardHtml(item, editable) {
         const photo = item.photoUrl
-            ? `<div class="thumb" style="background-image:url('${esc(item.photoUrl)}')"></div>`
+            ? `<div class="thumb" style="background-image:url('${esc(url(item.photoUrl))}')"></div>`
             : '<div class="thumb">🍽️</div>';
 
         return `
@@ -524,7 +533,7 @@
                     : `<div class="recipe-list">${recipes.map((recipe) => `
                         <button class="recipe-row" data-id="${recipe.id}">
                             ${recipe.photoUrl
-                                ? `<div class="thumb" style="background-image:url('${esc(recipe.photoUrl)}')"></div>`
+                                ? `<div class="thumb" style="background-image:url('${esc(url(recipe.photoUrl))}')"></div>`
                                 : '<div class="thumb">🍽️</div>'}
                             <div style="flex:1;min-width:0">
                                 <div class="name">${esc(recipe.name)}</div>
@@ -578,7 +587,7 @@
                         <label>Photo (optionnelle)</label>
                         <div class="row">
                             ${recipe.photoUrl
-                                ? `<div class="thumb" style="background-image:url('${esc(recipe.photoUrl)}')"></div>`
+                                ? `<div class="thumb" style="background-image:url('${esc(url(recipe.photoUrl))}')"></div>`
                                 : '<div class="thumb">📷</div>'}
                             <input type="file" id="photo" accept="image/*" style="flex:1">
                             ${recipe.photoUrl ? '<button class="btn-danger btn-sm" id="remove-photo">Retirer</button>' : ''}
@@ -792,9 +801,9 @@
 
         app.querySelector('#invite').onclick = () => withLoader(async () => {
             const res = await api('/auth/invitations', { method: 'POST' });
-            const url = `${location.origin}/?invitation=${res.token}`;
-            app.querySelector('#invite-result').textContent = url;
-            try { await navigator.clipboard.writeText(url); toast('Lien copié'); } catch (e) { /* ignoré */ }
+            const link = url('?invitation=' + encodeURIComponent(res.token));
+            app.querySelector('#invite-result').textContent = link;
+            try { await navigator.clipboard.writeText(link); toast('Lien copié'); } catch (e) { /* ignoré */ }
         });
         app.querySelector('#go-catalog').onclick = () => go('catalog');
         app.querySelector('#logout').onclick = () => withLoader(async () => {

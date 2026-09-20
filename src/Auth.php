@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Food;
 
 use Food\Http\HttpException;
+use Food\Http\Request;
 use PDO;
 
 final class Auth
@@ -22,7 +23,9 @@ final class Auth
                 'httponly' => true,
                 'samesite' => 'Lax',
                 'secure' => $https,
-                'path' => '/',
+                // Limité au sous-dossier de publication pour ne pas entrer en
+                // conflit avec une autre application du même domaine.
+                'path' => Request::detectBasePath() . '/',
             ]);
             session_start();
         }

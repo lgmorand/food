@@ -52,7 +52,8 @@ final class UploadController
             }
         }
 
-        return Response::json(['url' => '/uploads/' . $name], 201);
+        // URL relative : l'application peut être publiée dans un sous-dossier.
+        return Response::json(['url' => 'uploads/' . $name], 201);
     }
 
     /** Redimensionne l'image si GD est disponible ; retourne false sinon. */

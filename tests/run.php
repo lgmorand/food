@@ -451,6 +451,35 @@ $t->test('Semaine calendaire calée sur le lundi', function (TestRunner $t): voi
     $t->assertSame('2026-09-14', \Food\Support::mondayOf('2026-09-14'), 'lundi inchangé');
 });
 
+$t->test('Publication dans un sous-dossier', function (TestRunner $t): void {
+    $request = static function (string $script, string $uri): \Food\Http\Request {
+        $_SERVER['SCRIPT_NAME'] = $script;
+        $_SERVER['REQUEST_URI'] = $uri;
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+
+        return \Food\Http\Request::fromGlobals();
+    };
+
+    $racine = $request('/index.php', '/api/menus/current');
+    $t->assertSame('', $racine->basePath, 'racine du domaine : aucun préfixe');
+    $t->assertSame('/api/menus/current', $racine->path, 'chemin inchangé à la racine');
+
+    $sous = $request('/food/index.php', '/food/api/menus/current?x=1');
+    $t->assertSame('/food', $sous->basePath, 'préfixe détecté');
+    $t->assertSame('/api/menus/current', $sous->path, 'préfixe retiré du chemin');
+
+    $accueil = $request('/food/index.php', '/food/');
+    $t->assertSame('/', $accueil->path, 'accueil du sous-dossier');
+
+    $sansSlash = $request('/food/index.php', '/food');
+    $t->assertSame('/', $sansSlash->path, 'accueil sans barre oblique finale');
+
+    $homonyme = $request('/food/index.php', '/foodie/api/menus/current');
+    $t->assertSame('/foodie/api/menus/current', $homonyme->path, 'préfixe homonyme non retiré');
+
+    unset($_SERVER['SCRIPT_NAME'], $_SERVER['REQUEST_URI'], $_SERVER['REQUEST_METHOD']);
+});
+
 $exit = $t->summary();
 
 Database::reset();

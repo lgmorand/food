@@ -1,0 +1,36 @@
+# Configuration utilisée lorsque le dépôt est déployé tel quel dans un dossier
+# servi par Apache (par exemple www/food publié sous https://exemple.fr/food).
+# Si la racine du site pointe déjà sur public/, ce fichier n'est pas utilisé.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Le code, la base de données et les outils ne sont jamais accessibles.
+    RewriteRule ^(src|database|tests|bin|docs|\.github|\.git)(/|$) - [F,L]
+    RewriteRule ^(bootstrap\.php|composer\.(json|lock)|.*\.md)$ - [F,L]
+
+    # Ressources statiques de l'application.
+    RewriteRule ^(assets|uploads)/(.*)$ public/$1/$2 [L]
+
+    # Tout le reste passe par le front controller.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+</IfModule>
+
+# Filet de sécurité si mod_rewrite est absent.
+<FilesMatch "\.(sqlite|sqlite-wal|sqlite-shm|sql|md)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
