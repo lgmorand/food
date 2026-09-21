@@ -828,11 +828,29 @@
                     <button class="btn-ghost btn-block" id="go-catalog">Gérer les ingrédients</button>
                 </div>
                 <div class="card">
-                    <h2 style="margin-top:0">Export</h2>
-                    <p class="muted">Télécharge au format JSON les recettes avec leurs ingrédients
-                       et le référentiel d'ingrédients.</p>
+                    <h2 style="margin-top:0">Sauvegarde</h2>
+                    <p class="muted">L'export contient les recettes et le référentiel d'ingrédients.
+                       La sauvegarde complète y ajoute les menus et leurs listes de courses.</p>
                     <a class="btn btn-secondary btn-block" id="export" href="${esc(url('api/export'))}"
-                       download="food-export.json">⬇️ Exporter en JSON</a>
+                       download="food-export.json">⬇️ Exporter le catalogue</a>
+                    <a class="btn btn-secondary btn-block" id="backup" style="margin-top:8px"
+                       href="${esc(url('api/backup'))}" download="food-sauvegarde.json">💾 Sauvegarde complète</a>
+                </div>
+                <div class="card">
+                    <h2 style="margin-top:0">Import</h2>
+                    <p class="muted">Relit un fichier JSON produit par l'export ou la sauvegarde.</p>
+                    <div class="field">
+                        <label for="import-mode">Mode</label>
+                        <select id="import-mode">
+                            <option value="merge">Compléter (ajoute ce qui manque)</option>
+                            <option value="replace">Remplacer (efface puis réimporte)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="import-file">Fichier de sauvegarde</label>
+                        <input id="import-file" type="file" accept="application/json,.json">
+                    </div>
+                    <button class="btn-secondary btn-block" id="import-run">⬆️ Importer</button>
                 </div>
                 <button class="btn-danger btn-block" id="logout">Se déconnecter</button>
             </div>` + tabbar('settings');
@@ -860,6 +878,31 @@
             });
         };
         app.querySelector('#go-catalog').onclick = () => go('catalog');
+        app.querySelector('#import-run').onclick = () => {
+            const input = app.querySelector('#import-file');
+            const mode = app.querySelector('#import-mode').value;
+            const file = input.files && input.files[0];
+            if (!file) {
+                toast('Choisissez d\'abord un fichier JSON.', true);
+                return;
+            }
+            if (mode === 'replace'
+                && !confirm('Le mode « Remplacer » efface les données actuelles avant l\'import. Continuer ?')) {
+                return;
+            }
+            withLoader(async () => {
+                let data = null;
+                try {
+                    data = JSON.parse(await file.text());
+                } catch (e) {
+                    throw new Error('Fichier JSON illisible.');
+                }
+                const res = await api('/import', { method: 'POST', body: { mode, data } });
+                input.value = '';
+                state.data.ingredients = (await api('/ingredients')).ingredients;
+                toast(res.message);
+            });
+        };
         app.querySelector('#logout').onclick = () => withLoader(async () => {
             await api('/auth/logout', { method: 'POST' });
             state.user = null;

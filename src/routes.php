@@ -31,8 +31,10 @@ $router->get('/api/auth/me', static fn () => $auth->me());
 $router->post('/api/auth/password', static fn ($r) => $auth->changePassword($r));
 $router->post('/api/auth/username', static fn ($r) => $auth->changeUsername($r));
 
-// Export du catalogue
+// Export du catalogue, sauvegarde complète et import
 $router->get('/api/export', static fn () => $export->json());
+$router->get('/api/backup', static fn () => $export->backup());
+$router->post('/api/import', static fn ($r) => $export->import($r));
 
 // Recettes
 $router->get('/api/recipes', static fn ($r) => $recipes->index($r));

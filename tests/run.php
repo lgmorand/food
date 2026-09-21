@@ -514,6 +514,106 @@ $t->test('Rejouer un menu depuis l\'historique', function (TestRunner $t) use ($
     $t->assertSame(1, count($menus->history($h)), "l'historique contient le menu validé");
 });
 
+$t->test('Sauvegarde complète et restauration', function (TestRunner $t) use ($recipes, $menus, $lists, $ingredients): void {
+    $source = Auth::createHousehold('Source');
+    makeRecipe($recipes, $source, 'Gratin de courgettes', [
+        ['name' => 'Courgette', 'quantity' => 3, 'unit' => 'piece', 'category' => 'fruits_legumes'],
+        ['name' => 'Crème', 'quantity' => 20, 'unit' => 'ml', 'category' => 'cremerie'],
+    ]);
+    for ($i = 1; $i <= 6; $i++) {
+        makeRecipe($recipes, $source, "Plat B{$i}", [['name' => "Produit B{$i}", 'quantity' => 1, 'unit' => 'piece']]);
+    }
+    $menu = $menus->validate($source, $menus->generate($source, 5, '2026-04-06')['id']);
+    $lists->generateForMenu($source, $menu['id']);
+
+    $backup = \Food\Domain\Backup::build($source, true);
+    $t->assertSame('complet', $backup['kind'], 'type de sauvegarde');
+    $t->assertSame(7, count($backup['recipes']), 'toutes les recettes sont sauvegardées');
+    $t->assertSame(1, count($backup['menus']), 'le menu validé est sauvegardé');
+    $t->assertSame(5, count($backup['menus'][0]['items']), 'les cinq repas sont sauvegardés');
+    $t->assert(
+        count($backup['menus'][0]['shoppingList']['items']) > 0,
+        'la liste de courses est sauvegardée'
+    );
+    $t->assert(!isset($backup['recipes'][0]['id']), 'aucun identifiant technique dans le fichier');
+
+    // Restauration dans un foyer neuf : tout doit être recréé à l'identique.
+    $cible = Auth::createHousehold('Cible');
+    $counts = \Food\Domain\Backup::restore($cible, $backup, 'merge');
+    $t->assertSame(7, $counts['recipesCreated'], 'recettes restaurées');
+    $t->assertSame(1, $counts['menusCreated'], 'menu restauré');
+    $t->assertSame(7, count($recipes->all($cible)), 'catalogue restauré');
+
+    $gratin = null;
+    foreach ($recipes->all($cible) as $recipe) {
+        if ($recipe['name'] === 'Gratin de courgettes') {
+            $gratin = $recipe;
+        }
+    }
+    $t->assert($gratin !== null, 'recette retrouvée par son nom');
+    $t->assertSame(2, count($gratin['ingredients']), 'ingrédients de la recette restaurés');
+    $t->assertSame(3.0, $gratin['ingredients'][0]['quantity'], 'quantité restaurée');
+    $t->assertSame('fruits_legumes', $gratin['ingredients'][0]['category'], 'rayon restauré');
+
+    $restored = $menus->history($cible);
+    $t->assertSame(1, count($restored), 'le menu validé est restauré dans l\'historique');
+    $t->assertSame('2026-04-06', $restored[0]['weekStart'], 'semaine restaurée');
+    $t->assert(
+        (($lists->findByMenu($cible, $restored[0]['id']) ?? ['totalCount' => 0])['totalCount']) > 0,
+        'liste de courses restaurée'
+    );
+
+    // Deuxième import : rien n'est dupliqué en mode « merge ».
+    $again = \Food\Domain\Backup::restore($cible, $backup, 'merge');
+    $t->assertSame(0, $again['recipesCreated'], 'aucune recette dupliquée');
+    $t->assertSame(7, $again['recipesSkipped'], 'les doublons sont ignorés');
+    $t->assertSame(0, $again['menusCreated'], 'aucun menu dupliqué');
+    $t->assertSame(1, count($menus->history($cible)), 'historique inchangé');
+    $t->assertSame(7, count($recipes->all($cible)), 'catalogue inchangé');
+
+    // Mode remplacement : le catalogue est remis à l'état du fichier.
+    makeRecipe($recipes, $cible, 'Recette en trop', [['name' => 'Truc', 'quantity' => 1, 'unit' => 'piece']]);
+    $t->assertSame(8, count($recipes->all($cible)), 'recette supplémentaire ajoutée');
+    $replaced = \Food\Domain\Backup::restore($cible, $backup, 'replace');
+    $t->assertSame(7, $replaced['recipesCreated'], 'tout est réimporté');
+    $t->assertSame(7, count($recipes->all($cible)), 'la recette en trop a disparu');
+    $t->assertSame(1, count($menus->history($cible)), 'les menus sont remplacés, pas cumulés');
+    $t->assert(count($ingredients->all($cible)) > 0, 'référentiel réimporté');
+});
+
+$t->test('Import : fichiers invalides refusés', function (TestRunner $t): void {
+    $h = Auth::createHousehold('Import invalide');
+    $t->assertThrows(
+        'sauvegarde Food',
+        static fn () => \Food\Domain\Backup::restore($h, ['application' => 'Autre'], 'merge'),
+        'application inconnue refusée'
+    );
+    $t->assertThrows(
+        'non pris en charge',
+        static fn () => \Food\Domain\Backup::restore(
+            $h,
+            ['application' => 'Food', 'formatVersion' => 99, 'recipes' => []],
+            'merge'
+        ),
+        'version future refusée'
+    );
+    $t->assertThrows(
+        'aucune donnée',
+        static fn () => \Food\Domain\Backup::restore($h, ['application' => 'Food', 'formatVersion' => 1], 'merge'),
+        'fichier vide refusé'
+    );
+    $t->assertThrows(
+        'Mode',
+        static fn () => \Food\Domain\Backup::restore(
+            $h,
+            ['application' => 'Food', 'formatVersion' => 1, 'recipes' => [['name' => 'X']]],
+            'ecraser'
+        ),
+        'mode inconnu refusé'
+    );
+    $t->assertSame(0, count((new RecipeRepository())->all($h)), 'aucun effet de bord');
+});
+
 $t->test('Conversions et formatage des unités', function (TestRunner $t): void {
     $t->assertSame(1200.0, Units::toBase(1.2, 'kg'), '1,2 kg = 1200 g');
     $t->assertSame(['quantity' => 1.2, 'unit' => 'kg'], Units::humanize(1200, 'masse'), '1200 g -> 1,2 kg');

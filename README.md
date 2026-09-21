@@ -61,12 +61,29 @@ php bin/seed.php "votre-mot-de-passe" [identifiant]
 
 Crée le compte s'il n'existe pas encore et ajoute 10 recettes.
 
-### Export des données
+### Sauvegarde, export et import
 
-L'écran **Réglages** propose « Exporter en JSON » : le fichier téléchargé
-(`food-export-AAAA-MM-JJ.json`) contient le référentiel d'ingrédients et toutes
-les recettes avec leurs ingrédients, quantités et unités. Le même contenu est
-accessible via `GET /api/export` (session requise).
+L'écran **Réglages** propose deux téléchargements :
+
+| Bouton                | Fichier                       | Contenu                                      |
+| --------------------- | ----------------------------- | -------------------------------------------- |
+| Exporter le catalogue | `food-export-AAAA-MM-JJ.json` | ingrédients + recettes                        |
+| Sauvegarde complète   | `food-sauvegarde-AAAA-MM-JJ.json` | le catalogue **plus** les menus et leurs listes de courses |
+
+Les deux fichiers sont lisibles et modifiables à la main : ils ne contiennent
+aucun identifiant technique, tout est relié par les noms (et aucun mot de
+passe n'y figure).
+
+Le bloc **Import** relit l'un ou l'autre de ces fichiers, en deux modes :
+
+- **Compléter** : ajoute ce qui manque et ignore ce qui existe déjà (comparaison
+  sur le nom, accents et pluriels normalisés). Réimporter deux fois le même
+  fichier ne crée aucun doublon.
+- **Remplacer** : efface les données existantes avant de réimporter le fichier.
+  Les menus ne sont effacés que si le fichier en contient.
+
+Côté API (session requise) : `GET /api/export`, `GET /api/backup` et
+`POST /api/import` avec `{ "mode": "merge|replace", "data": { ... } }`.
 
 L'identifiant du compte peut aussi être modifié depuis cet écran.
 

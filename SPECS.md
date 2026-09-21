@@ -194,9 +194,16 @@ Contrainte : un ingrédient ne peut apparaître qu'une fois dans une recette.
 
 - Changement du mot de passe et de l'identifiant du compte partagé.
 - Gestion du référentiel d'ingrédients (rayon, suppression).
-- **Export JSON** : télécharge un fichier contenant le référentiel
-  d'ingrédients et toutes les recettes avec leurs ingrédients, quantités et
-  unités (`GET /api/export`). Sert de sauvegarde et de reprise de données.
+- **Export JSON** : télécharge le référentiel d'ingrédients et toutes les
+  recettes avec leurs ingrédients, quantités et unités (`GET /api/export`).
+- **Sauvegarde complète** : même contenu, complété des menus et de leurs listes
+  de courses (`GET /api/backup`).
+- **Import** (`POST /api/import`) : relit l'un de ces fichiers, en mode
+  « compléter » (ajoute ce qui manque, ignore les doublons de nom) ou
+  « remplacer » (efface les données existantes avant réimport). Les fichiers ne
+  contiennent aucun identifiant technique : les liens entre recettes,
+  ingrédients et menus se font par les noms, ce qui permet de les relire dans
+  une base neuve ou de les modifier à la main.
 
 ## 6. Règles de génération du menu
 

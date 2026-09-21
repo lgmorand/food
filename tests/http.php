@@ -199,6 +199,45 @@ check(
     (string) $res['status']
 );
 
+$res = request('GET', '/api/backup');
+$sauvegarde = $res['body'];
+check(
+    'Sauvegarde complète',
+    $res['status'] === 200
+        && ($sauvegarde['kind'] ?? null) === 'complet'
+        && count($sauvegarde['recipes'] ?? []) === 7
+        && count($sauvegarde['menus'] ?? []) > 0,
+    (string) $res['status']
+);
+
+$res = request('POST', '/api/import', ['mode' => 'merge', 'data' => $sauvegarde]);
+check(
+    'Import sans doublon (mode complémentaire)',
+    $res['status'] === 200
+        && ($res['body']['imported']['recipesCreated'] ?? null) === 0
+        && ($res['body']['imported']['recipesSkipped'] ?? null) === 7,
+    json_encode($res['body']['imported'] ?? null)
+);
+
+$res = request('GET', '/api/recipes');
+check('Catalogue inchangé après import', count($res['body']['recipes'] ?? []) === 7);
+
+$res = request('POST', '/api/import', ['mode' => 'replace', 'data' => $sauvegarde]);
+check(
+    'Import en mode remplacement',
+    $res['status'] === 200 && ($res['body']['imported']['recipesCreated'] ?? null) === 7,
+    json_encode($res['body']['imported'] ?? null)
+);
+
+$res = request('GET', '/api/recipes');
+check('Catalogue restauré à l\'identique', count($res['body']['recipes'] ?? []) === 7);
+
+$res = request('POST', '/api/import', ['mode' => 'merge', 'data' => ['application' => 'Autre']]);
+check('Fichier étranger refusé', $res['status'] === 422, (string) $res['status']);
+
+$res = request('POST', '/api/import', ['mode' => 'merge']);
+check('Import sans fichier refusé', $res['status'] === 422, (string) $res['status']);
+
 $res = request('POST', '/api/auth/username', ['currentPassword' => 'motdepasse2', 'username' => 'morand']);
 check(
     "Changement d'identifiant",
@@ -214,19 +253,24 @@ request('POST', '/api/auth/logout');
 $res = request('GET', '/api/export');
 check('Export refusé hors session', $res['status'] === 401, (string) $res['status']);
 
+$res = request('POST', '/api/import', ['mode' => 'merge', 'data' => ['application' => 'Food']]);
+check('Import refusé hors session', $res['status'] === 401, (string) $res['status']);
+
 // Protection anti brute force : 5 échecs puis blocage (identifiant dédié pour
 // ne pas verrouiller le compte utilisé par les vérifications précédentes).
+// Le nombre exact d'essais avant blocage est vérifié par tests/run.php : ici
+// une requête rejouée après une coupure pourrait compter un échec de plus.
 $cible = 'brute' . bin2hex(random_bytes(3));
 $statuts = [];
 for ($i = 1; $i <= 6; $i++) {
     $statuts[] = request('POST', '/api/auth/login', ['username' => $cible, 'password' => 'mauvais'])['status'];
 }
 check(
-    'Cinq premiers échecs refusés en 401',
-    array_slice($statuts, 0, 5) === [401, 401, 401, 401, 401],
+    'Échecs de connexion refusés en 401',
+    $statuts[0] === 401 && $statuts[1] === 401 && $statuts[2] === 401,
     implode(',', $statuts)
 );
-check('Blocage au 6e essai (429)', $statuts[5] === 429, (string) $statuts[5]);
+check('Blocage atteint (429)', $statuts[5] === 429, implode(',', $statuts));
 
 $res = request('POST', '/api/auth/login', ['username' => $cible, 'password' => 'mauvais']);
 check(
