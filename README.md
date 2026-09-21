@@ -7,6 +7,7 @@ pour un foyer de deux personnes.
 - Génération d'un menu de 5 ou 6 recettes sans doublon
 - Remplacement / retrait d'une recette avec nouveau tirage au hasard
 - Liste de courses agrégée par rayon à partir du menu validé
+- Export JSON des recettes et du référentiel d'ingrédients
 - Un compte unique partagé par les deux utilisateurs
 
 Les spécifications fonctionnelles sont dans [SPECS.md](SPECS.md).
@@ -54,6 +55,15 @@ php bin/seed.php "votre-mot-de-passe" [identifiant]
 ```
 
 Crée le compte s'il n'existe pas encore et ajoute 10 recettes.
+
+### Export des données
+
+L'écran **Réglages** propose « Exporter en JSON » : le fichier téléchargé
+(`food-export-AAAA-MM-JJ.json`) contient le référentiel d'ingrédients et toutes
+les recettes avec leurs ingrédients, quantités et unités. Le même contenu est
+accessible via `GET /api/export` (session requise).
+
+L'identifiant du compte peut aussi être modifié depuis cet écran.
 
 ### Variables d'environnement
 

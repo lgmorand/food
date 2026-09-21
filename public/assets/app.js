@@ -778,11 +778,13 @@
     /* ------------------------------------------------------- Vue : réglages */
 
     function renderSettings() {
-        app.innerHTML = topbar('Réglages', state.user ? state.user.username : '', true) + `
+        const username = state.user ? state.user.username : '';
+
+        app.innerHTML = topbar('Réglages', username, true) + `
             <div class="screen">
                 <div class="card">
                     <h2 style="margin-top:0">Compte</h2>
-                    <p class="muted">Un seul compte partagé : ${esc(state.user ? state.user.username : '')}.</p>
+                    <p class="muted">Un seul compte partagé : ${esc(username)}.</p>
                     <form id="password-form">
                         <div class="field">
                             <label for="currentPassword">Mot de passe actuel</label>
@@ -796,11 +798,31 @@
                         </div>
                         <button class="btn-secondary btn-block" type="submit">Changer le mot de passe</button>
                     </form>
+                    <form id="username-form" style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">
+                        <div class="field">
+                            <label for="newUsername">Identifiant</label>
+                            <input id="newUsername" name="username" required autocomplete="username"
+                                   value="${esc(username)}">
+                        </div>
+                        <div class="field">
+                            <label for="usernamePassword">Mot de passe (confirmation)</label>
+                            <input id="usernamePassword" name="currentPassword" type="password" required
+                                   autocomplete="current-password">
+                        </div>
+                        <button class="btn-ghost btn-block" type="submit">Changer l'identifiant</button>
+                    </form>
                 </div>
                 <div class="card">
                     <h2 style="margin-top:0">Ingrédients</h2>
                     <p class="muted">${(state.data.ingredients || []).length} ingrédient(s) au référentiel.</p>
                     <button class="btn-ghost btn-block" id="go-catalog">Gérer les ingrédients</button>
+                </div>
+                <div class="card">
+                    <h2 style="margin-top:0">Export</h2>
+                    <p class="muted">Télécharge au format JSON les recettes avec leurs ingrédients
+                       et le référentiel d'ingrédients.</p>
+                    <a class="btn btn-secondary btn-block" id="export" href="${esc(url('api/export'))}"
+                       download="food-export.json">⬇️ Exporter en JSON</a>
                 </div>
                 <button class="btn-danger btn-block" id="logout">Se déconnecter</button>
             </div>` + tabbar('settings');
@@ -808,10 +830,23 @@
 
         app.querySelector('#password-form').onsubmit = (event) => {
             event.preventDefault();
-            const body = Object.fromEntries(new FormData(event.target).entries());
+            const form = event.target;
+            const body = Object.fromEntries(new FormData(form).entries());
             withLoader(async () => {
                 await api('/auth/password', { method: 'POST', body });
+                form.reset();
                 toast('Mot de passe modifié');
+            });
+        };
+        app.querySelector('#username-form').onsubmit = (event) => {
+            event.preventDefault();
+            const body = Object.fromEntries(new FormData(event.target).entries());
+            withLoader(async () => {
+                const res = await api('/auth/username', { method: 'POST', body });
+                state.user = res.user;
+                state.defaultUsername = res.user.username;
+                toast('Identifiant modifié');
+                render();
             });
         };
         app.querySelector('#go-catalog').onclick = () => go('catalog');

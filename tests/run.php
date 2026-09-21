@@ -444,6 +444,20 @@ $t->test('Changement de mot de passe', function (TestRunner $t) use ($user): voi
     Auth::changePassword($user['id'], 'motdepasse2', 'motdepasse1');
 });
 
+$t->test('Changement d\'identifiant', function (TestRunner $t) use ($user): void {
+    $t->assertThrows(
+        'incorrect',
+        static fn () => Auth::changeUsername($user['id'], 'mauvais', 'morand'),
+        'le mot de passe est vérifié'
+    );
+
+    $renamed = Auth::changeUsername($user['id'], 'motdepasse1', 'Morand');
+    $t->assertSame('morand', $renamed['username'], "l'identifiant est normalisé en minuscules");
+    $t->assertSame($user['id'], Auth::attempt('morand', 'motdepasse1')['id'], 'connexion avec le nouvel identifiant');
+
+    Auth::changeUsername($user['id'], 'motdepasse1', 'testeur');
+});
+
 $t->test('Rejouer un menu depuis l\'historique', function (TestRunner $t) use ($recipes, $menus): void {
     $h = Auth::createHousehold('Rejouer');
     for ($i = 1; $i <= 8; $i++) {

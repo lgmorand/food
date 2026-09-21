@@ -171,6 +171,36 @@ final class Auth
         return self::requireUser()['householdId'];
     }
 
+    public static function changeUsername(string $userId, string $currentPassword, string $newUsername): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch();
+
+        if ($row === false || !password_verify($currentPassword, $row['password_hash'])) {
+            throw HttpException::badRequest(
+                'Mot de passe incorrect.',
+                ['currentPassword' => 'Mot de passe incorrect.']
+            );
+        }
+
+        $newUsername = self::normalizeUsername($newUsername);
+        if ($newUsername === '') {
+            throw HttpException::badRequest('Identifiant invalide.', ['username' => 'Identifiant requis.']);
+        }
+
+        $taken = $pdo->prepare('SELECT 1 FROM users WHERE username = ? AND id <> ?');
+        $taken->execute([$newUsername, $userId]);
+        if ($taken->fetchColumn() !== false) {
+            throw HttpException::conflict('Cet identifiant est déjà utilisé.');
+        }
+
+        $pdo->prepare('UPDATE users SET username = ? WHERE id = ?')->execute([$newUsername, $userId]);
+
+        return self::findUser($userId) ?? throw HttpException::notFound();
+    }
+
     public static function createHousehold(string $name): string
     {
         $householdId = Support::uuid();

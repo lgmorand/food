@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Food\Controller\AuthController;
+use Food\Controller\ExportController;
 use Food\Controller\IngredientController;
 use Food\Controller\MenuController;
 use Food\Controller\RecipeController;
@@ -19,6 +20,7 @@ $ingredients = new IngredientController();
 $menus = new MenuController();
 $lists = new ShoppingListController();
 $uploads = new UploadController();
+$export = new ExportController();
 
 // Authentification
 $router->post('/api/auth/setup', static fn ($r) => $auth->setup($r));
@@ -27,6 +29,10 @@ $router->post('/api/auth/login', static fn ($r) => $auth->login($r));
 $router->post('/api/auth/logout', static fn () => $auth->logout());
 $router->get('/api/auth/me', static fn () => $auth->me());
 $router->post('/api/auth/password', static fn ($r) => $auth->changePassword($r));
+$router->post('/api/auth/username', static fn ($r) => $auth->changeUsername($r));
+
+// Export du catalogue
+$router->get('/api/export', static fn () => $export->json());
 
 // Recettes
 $router->get('/api/recipes', static fn ($r) => $recipes->index($r));

@@ -186,6 +186,14 @@ Contrainte : un ingrédient ne peut apparaître qu'une fois dans une recette.
 - Consultation du menu et de sa liste de courses.
 - Action « Rejouer ce menu » : crée un nouveau menu `draft` avec les mêmes recettes.
 
+### 5.8 Réglages
+
+- Changement du mot de passe et de l'identifiant du compte partagé.
+- Gestion du référentiel d'ingrédients (rayon, suppression).
+- **Export JSON** : télécharge un fichier contenant le référentiel
+  d'ingrédients et toutes les recettes avec leurs ingrédients, quantités et
+  unités (`GET /api/export`). Sert de sauvegarde et de reprise de données.
+
 ## 6. Règles de génération du menu
 
 1. Le tirage se fait parmi les recettes **actives** du foyer.

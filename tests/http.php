@@ -188,6 +188,32 @@ request('POST', '/api/auth/logout');
 $res = request('POST', '/api/auth/login', ['username' => $username, 'password' => 'motdepasse2']);
 check('Connexion avec le nouveau mot de passe', $res['status'] === 200);
 
+$res = request('GET', '/api/export');
+check(
+    'Export JSON du catalogue',
+    $res['status'] === 200
+        && ($res['body']['formatVersion'] ?? null) === 1
+        && count($res['body']['recipes'] ?? []) === 7
+        && count($res['body']['ingredients'] ?? []) > 0
+        && isset($res['body']['recipes'][0]['ingredients'][0]['name']),
+    (string) $res['status']
+);
+
+$res = request('POST', '/api/auth/username', ['currentPassword' => 'motdepasse2', 'username' => 'morand']);
+check(
+    "Changement d'identifiant",
+    $res['status'] === 200 && ($res['body']['user']['username'] ?? null) === 'morand',
+    (string) $res['status']
+);
+
+request('POST', '/api/auth/logout');
+$res = request('POST', '/api/auth/login', ['username' => 'morand', 'password' => 'motdepasse2']);
+check('Connexion avec le nouvel identifiant', $res['status'] === 200);
+
+request('POST', '/api/auth/logout');
+$res = request('GET', '/api/export');
+check('Export refusé hors session', $res['status'] === 401, (string) $res['status']);
+
 echo "\n" . str_repeat('-', 60) . "\n";
 @unlink($cookieJar);
 

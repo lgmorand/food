@@ -50,6 +50,18 @@ final class AuthController
         return Response::noContent();
     }
 
+    public function changeUsername(Request $request): Response
+    {
+        $user = Auth::requireUser();
+        $updated = Auth::changeUsername(
+            $user['id'],
+            (string) $request->input('currentPassword', ''),
+            $request->string('username')
+        );
+
+        return Response::json(['user' => $updated]);
+    }
+
     public function logout(): Response
     {
         Auth::logout();

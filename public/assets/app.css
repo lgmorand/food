@@ -92,6 +92,7 @@ button, .btn {
     align-items: center;
     justify-content: center;
     gap: 8px;
+    text-decoration: none;
 }
 .btn-primary { background: var(--green); color: #fff; }
 .btn-primary:active { background: var(--green-dark); }
