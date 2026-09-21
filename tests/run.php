@@ -94,7 +94,7 @@ $recipes = new RecipeRepository();
 $menus = new MenuRepository();
 $lists = new ShoppingListRepository();
 
-$user = Auth::register('test@example.com', 'motdepasse1', 'Testeur');
+$user = Auth::setup('motdepasse1', 'testeur');
 $household = $user['householdId'];
 
 function makeRecipe(RecipeRepository $recipes, string $household, string $name, array $ingredients): array
@@ -239,7 +239,7 @@ $t->test('Affectation manuelle d\'une recette déjà présente refusée', functi
 });
 
 $t->test('Menu incomplet quand le catalogue est trop petit', function (TestRunner $t) use ($recipes, $menus): void {
-    $small = Auth::register('petit@example.com', 'motdepasse1', 'Petit')['householdId'];
+    $small = Auth::createHousehold('Petit');
     makeRecipe($recipes, $small, 'Unique', [['name' => 'Pain', 'quantity' => 1, 'unit' => 'piece']]);
 
     $menu = $menus->generate($small, 5);
@@ -252,7 +252,7 @@ $t->test('Menu incomplet quand le catalogue est trop petit', function (TestRunne
 });
 
 $t->test('Agrégation des quantités par unité compatible', function (TestRunner $t) use ($recipes, $menus, $lists): void {
-    $h = Auth::register('courses@example.com', 'motdepasse1', 'Courses')['householdId'];
+    $h = Auth::createHousehold('Courses');
 
     makeRecipe($recipes, $h, 'Recette A', [
         ['name' => 'Farine', 'quantity' => 800, 'unit' => 'g', 'category' => 'epicerie'],
@@ -288,7 +288,7 @@ $t->test('Agrégation des quantités par unité compatible', function (TestRunne
 });
 
 $t->test('Regroupement de la liste par rayon', function (TestRunner $t) use ($recipes, $menus, $lists): void {
-    $h = Auth::register('rayons@example.com', 'motdepasse1', 'Rayons')['householdId'];
+    $h = Auth::createHousehold('Rayons');
     makeRecipe($recipes, $h, 'Rayon test', [
         ['name' => 'Pain', 'quantity' => 1, 'unit' => 'piece', 'category' => 'boulangerie'],
         ['name' => 'Steak', 'quantity' => 2, 'unit' => 'piece', 'category' => 'viande_poisson'],
@@ -304,7 +304,7 @@ $t->test('Regroupement de la liste par rayon', function (TestRunner $t) use ($re
 });
 
 $t->test('Cocher un article et ajouter un article libre', function (TestRunner $t) use ($recipes, $menus, $lists): void {
-    $h = Auth::register('caddie@example.com', 'motdepasse1', 'Caddie')['householdId'];
+    $h = Auth::createHousehold('Caddie');
     makeRecipe($recipes, $h, 'Simple', [['name' => 'Beurre', 'quantity' => 250, 'unit' => 'g', 'category' => 'cremerie']]);
 
     $menu = $menus->validate($h, $menus->generate($h, 5)['id']);
@@ -322,7 +322,7 @@ $t->test('Cocher un article et ajouter un article libre', function (TestRunner $
 });
 
 $t->test('Un menu validé ne peut plus être modifié', function (TestRunner $t) use ($recipes, $menus): void {
-    $h = Auth::register('fige@example.com', 'motdepasse1', 'Figé')['householdId'];
+    $h = Auth::createHousehold('Figé');
     for ($i = 1; $i <= 6; $i++) {
         makeRecipe($recipes, $h, "Plat {$i}", [['name' => "Produit {$i}", 'quantity' => 1, 'unit' => 'piece']]);
     }
@@ -338,7 +338,7 @@ $t->test('Un menu validé ne peut plus être modifié', function (TestRunner $t)
 });
 
 $t->test('Modifier une recette ne modifie pas une liste déjà générée', function (TestRunner $t) use ($recipes, $menus, $lists): void {
-    $h = Auth::register('fige2@example.com', 'motdepasse1', 'Figé2')['householdId'];
+    $h = Auth::createHousehold('Figé2');
     $recipe = makeRecipe($recipes, $h, 'Plat figé', [
         ['name' => 'Courgette', 'quantity' => 2, 'unit' => 'piece', 'category' => 'fruits_legumes'],
     ]);
@@ -357,7 +357,7 @@ $t->test('Modifier une recette ne modifie pas une liste déjà générée', func
 });
 
 $t->test('Anti-répétition sur les 2 dernières semaines validées', function (TestRunner $t) use ($recipes, $menus): void {
-    $h = Auth::register('repetition@example.com', 'motdepasse1', 'Répétition')['householdId'];
+    $h = Auth::createHousehold('Répétition');
     for ($i = 1; $i <= 10; $i++) {
         makeRecipe($recipes, $h, "Semaine plat {$i}", [['name' => "Produit R{$i}", 'quantity' => 1, 'unit' => 'piece']]);
     }
@@ -376,7 +376,7 @@ $t->test('Anti-répétition sur les 2 dernières semaines validées', function (
 });
 
 $t->test('Une recette inactive n\'est jamais tirée', function (TestRunner $t) use ($recipes, $menus): void {
-    $h = Auth::register('inactive@example.com', 'motdepasse1', 'Inactive')['householdId'];
+    $h = Auth::createHousehold('Inactive');
     for ($i = 1; $i <= 6; $i++) {
         makeRecipe($recipes, $h, "Actif {$i}", [['name' => "Produit I{$i}", 'quantity' => 1, 'unit' => 'piece']]);
     }
@@ -390,7 +390,7 @@ $t->test('Une recette inactive n\'est jamais tirée', function (TestRunner $t) u
 });
 
 $t->test('Suppression d\'un ingrédient utilisé refusée', function (TestRunner $t) use ($recipes, $ingredients): void {
-    $h = Auth::register('ingredient@example.com', 'motdepasse1', 'Ingrédient')['householdId'];
+    $h = Auth::createHousehold('Ingrédient');
     makeRecipe($recipes, $h, 'Avec pomme', [['name' => 'Pomme', 'quantity' => 3, 'unit' => 'piece']]);
     $pomme = $ingredients->findByName($h, 'pommes');
 
@@ -403,29 +403,49 @@ $t->test('Suppression d\'un ingrédient utilisé refusée', function (TestRunner
 });
 
 $t->test('Cloisonnement des données entre foyers', function (TestRunner $t) use ($recipes): void {
-    $a = Auth::register('foyer-a@example.com', 'motdepasse1', 'A')['householdId'];
-    $b = Auth::register('foyer-b@example.com', 'motdepasse1', 'B')['householdId'];
+    $a = Auth::createHousehold('A');
+    $b = Auth::createHousehold('B');
     $recipe = makeRecipe($recipes, $a, 'Privée', []);
 
     $t->assertSame(null, $recipes->find($b, $recipe['id']), 'le foyer B ne voit pas la recette du foyer A');
     $t->assertSame(0, count($recipes->all($b)), 'le catalogue du foyer B est vide');
 });
 
-$t->test('Invitation d\'un second membre dans le foyer', function (TestRunner $t): void {
-    $owner = Auth::register('proprio@example.com', 'motdepasse1', 'Proprio');
-    $invitation = Auth::createInvitation($owner['householdId']);
-    $partner = Auth::register('conjoint@example.com', 'motdepasse1', 'Conjoint', $invitation['token']);
-
-    $t->assertSame($owner['householdId'], $partner['householdId'], 'les deux comptes partagent le foyer');
+$t->test('Compte unique partagé', function (TestRunner $t) use ($user): void {
+    $t->assertSame('testeur', $user['username'], "l'identifiant est enregistré en minuscules");
+    $t->assertSame(false, Auth::needsSetup(), 'le compte existe, plus besoin de première configuration');
     $t->assertThrows(
-        'déjà été utilisée',
-        static fn () => Auth::register('tiers@example.com', 'motdepasse1', 'Tiers', $invitation['token']),
-        'une invitation ne sert qu\'une fois'
+        'déjà créé',
+        static fn () => Auth::setup('motdepasse2', 'autre'),
+        'un second compte ne peut pas être créé'
+    );
+    $t->assertSame($user['id'], Auth::attempt('TESTEUR', 'motdepasse1')['id'], "l'identifiant est insensible à la casse");
+    $t->assertThrows(
+        'incorrect',
+        static fn () => Auth::attempt('testeur', 'mauvais'),
+        'un mot de passe erroné est rejeté'
     );
 });
 
+$t->test('Changement de mot de passe', function (TestRunner $t) use ($user): void {
+    $t->assertThrows(
+        'actuel incorrect',
+        static fn () => Auth::changePassword($user['id'], 'mauvais', 'nouveaumotdepasse'),
+        "l'ancien mot de passe est vérifié"
+    );
+    $t->assertThrows(
+        '8 caractères',
+        static fn () => Auth::changePassword($user['id'], 'motdepasse1', 'court'),
+        'un mot de passe trop court est refusé'
+    );
+
+    Auth::changePassword($user['id'], 'motdepasse1', 'motdepasse2');
+    $t->assertSame($user['id'], Auth::attempt('testeur', 'motdepasse2')['id'], 'le nouveau mot de passe fonctionne');
+    Auth::changePassword($user['id'], 'motdepasse2', 'motdepasse1');
+});
+
 $t->test('Rejouer un menu depuis l\'historique', function (TestRunner $t) use ($recipes, $menus): void {
-    $h = Auth::register('rejouer@example.com', 'motdepasse1', 'Rejouer')['householdId'];
+    $h = Auth::createHousehold('Rejouer');
     for ($i = 1; $i <= 8; $i++) {
         makeRecipe($recipes, $h, "Histo {$i}", [['name' => "Produit H{$i}", 'quantity' => 1, 'unit' => 'piece']]);
     }
@@ -476,6 +496,10 @@ $t->test('Publication dans un sous-dossier', function (TestRunner $t): void {
 
     $homonyme = $request('/food/index.php', '/foodie/api/menus/current');
     $t->assertSame('/foodie/api/menus/current', $homonyme->path, 'préfixe homonyme non retiré');
+
+    $statique = $request('/assets/app.js', '/assets/app.js');
+    $t->assertSame('', $statique->basePath, 'un fichier statique ne définit pas de préfixe');
+    $t->assertSame('/assets/app.js', $statique->path, 'chemin du fichier statique inchangé');
 
     unset($_SERVER['SCRIPT_NAME'], $_SERVER['REQUEST_URI'], $_SERVER['REQUEST_METHOD']);
 });

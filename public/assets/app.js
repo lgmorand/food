@@ -7,6 +7,7 @@
 
     const state = {
         user: null,
+        defaultUsername: 'morand',
         units: {},
         categories: {},
         view: 'home',
@@ -91,7 +92,7 @@
     }
 
     function go(view, params = {}) {
-        if (state.view !== view && state.view !== 'login' && state.view !== 'register') {
+        if (state.view !== view && state.view !== 'login' && state.view !== 'setup') {
             state.stack.push({ view: state.view, params: state.params });
             if (state.stack.length > 20) state.stack.shift();
         }
@@ -158,8 +159,8 @@
     /* --------------------------------------------------------- Vues : auth */
 
     function renderAuth() {
-        const isRegister = state.view === 'register';
-        const invite = new URLSearchParams(location.search).get('invitation') || '';
+        const isSetup = state.view === 'setup';
+        const defaultUsername = state.defaultUsername || 'morand';
 
         app.innerHTML = `
             <div class="auth-wrap">
@@ -167,46 +168,42 @@
                 <h1 class="center">Food</h1>
                 <p class="center muted">Le menu de la semaine et les courses qui vont avec.</p>
                 <div class="card">
+                    ${isSetup ? `<p class="muted">Première utilisation : choisissez le mot de passe
+                        du compte partagé.</p>` : ''}
                     <form id="auth-form">
-                        ${isRegister ? `
-                            <div class="field">
-                                <label for="displayName">Prénom</label>
-                                <input id="displayName" name="displayName" autocomplete="given-name">
-                            </div>` : ''}
                         <div class="field">
-                            <label for="email">E-mail</label>
-                            <input id="email" name="email" type="email" required autocomplete="email">
+                            <label for="username">Identifiant</label>
+                            <input id="username" name="username" required autocomplete="username"
+                                   value="${esc(defaultUsername)}">
                         </div>
                         <div class="field">
                             <label for="password">Mot de passe</label>
                             <input id="password" name="password" type="password" required
-                                   autocomplete="${isRegister ? 'new-password' : 'current-password'}">
+                                   autocomplete="${isSetup ? 'new-password' : 'current-password'}">
                         </div>
-                        ${isRegister ? `
+                        ${isSetup ? `
                             <div class="field">
-                                <label for="invitationToken">Code d'invitation (optionnel)</label>
-                                <input id="invitationToken" name="invitationToken" value="${esc(invite)}"
-                                       placeholder="Pour rejoindre le foyer de votre conjoint·e">
+                                <label for="confirmation">Confirmer le mot de passe</label>
+                                <input id="confirmation" name="confirmation" type="password" required
+                                       autocomplete="new-password">
                             </div>` : ''}
                         <button class="btn-primary btn-block" type="submit">
-                            ${isRegister ? 'Créer mon compte' : 'Se connecter'}
+                            ${isSetup ? 'Créer le compte' : 'Se connecter'}
                         </button>
                     </form>
-                    <p class="center" style="margin-bottom:0">
-                        <button class="link-btn" id="toggle-auth">
-                            ${isRegister ? "J'ai déjà un compte" : 'Créer un compte'}
-                        </button>
-                    </p>
                 </div>
             </div>`;
 
-        app.querySelector('#toggle-auth').onclick = () => go(isRegister ? 'login' : 'register');
         app.querySelector('#auth-form').onsubmit = async (event) => {
             event.preventDefault();
-            const form = new FormData(event.target);
-            const body = Object.fromEntries(form.entries());
+            const body = Object.fromEntries(new FormData(event.target).entries());
+            if (isSetup && body.password !== body.confirmation) {
+                toast('Les deux mots de passe ne correspondent pas.', true);
+                return;
+            }
+            delete body.confirmation;
             try {
-                const res = await api(isRegister ? '/auth/register' : '/auth/login', { method: 'POST', body });
+                const res = await api(isSetup ? '/auth/setup' : '/auth/login', { method: 'POST', body });
                 state.user = res.user;
                 await bootstrapSession();
                 go('home');
@@ -781,14 +778,24 @@
     /* ------------------------------------------------------- Vue : réglages */
 
     function renderSettings() {
-        app.innerHTML = topbar('Réglages', state.user ? state.user.email : '', true) + `
+        app.innerHTML = topbar('Réglages', state.user ? state.user.username : '', true) + `
             <div class="screen">
                 <div class="card">
-                    <h2 style="margin-top:0">Foyer</h2>
-                    <p class="muted">Invitez votre conjoint·e à rejoindre le foyer pour partager
-                       recettes, menus et listes de courses.</p>
-                    <button class="btn-secondary btn-block" id="invite">Générer un code d'invitation</button>
-                    <p id="invite-result" class="muted"></p>
+                    <h2 style="margin-top:0">Compte</h2>
+                    <p class="muted">Un seul compte partagé : ${esc(state.user ? state.user.username : '')}.</p>
+                    <form id="password-form">
+                        <div class="field">
+                            <label for="currentPassword">Mot de passe actuel</label>
+                            <input id="currentPassword" name="currentPassword" type="password" required
+                                   autocomplete="current-password">
+                        </div>
+                        <div class="field">
+                            <label for="newPassword">Nouveau mot de passe</label>
+                            <input id="newPassword" name="newPassword" type="password" required
+                                   autocomplete="new-password">
+                        </div>
+                        <button class="btn-secondary btn-block" type="submit">Changer le mot de passe</button>
+                    </form>
                 </div>
                 <div class="card">
                     <h2 style="margin-top:0">Ingrédients</h2>
@@ -799,12 +806,14 @@
             </div>` + tabbar('settings');
         bindChrome();
 
-        app.querySelector('#invite').onclick = () => withLoader(async () => {
-            const res = await api('/auth/invitations', { method: 'POST' });
-            const link = url('?invitation=' + encodeURIComponent(res.token));
-            app.querySelector('#invite-result').textContent = link;
-            try { await navigator.clipboard.writeText(link); toast('Lien copié'); } catch (e) { /* ignoré */ }
-        });
+        app.querySelector('#password-form').onsubmit = (event) => {
+            event.preventDefault();
+            const body = Object.fromEntries(new FormData(event.target).entries());
+            withLoader(async () => {
+                await api('/auth/password', { method: 'POST', body });
+                toast('Mot de passe modifié');
+            });
+        };
         app.querySelector('#go-catalog').onclick = () => go('catalog');
         app.querySelector('#logout').onclick = () => withLoader(async () => {
             await api('/auth/logout', { method: 'POST' });
@@ -898,7 +907,7 @@
 
     const views = {
         login: renderAuth,
-        register: renderAuth,
+        setup: renderAuth,
         home: renderHome,
         menu: renderMenu,
         validate: renderValidate,
@@ -924,7 +933,7 @@
     }
 
     function render() {
-        if (state.loadError && state.view !== 'login' && state.view !== 'register') {
+        if (state.loadError && state.view !== 'login' && state.view !== 'setup') {
             renderLoadError();
             return;
         }
@@ -943,8 +952,13 @@
             await bootstrapSession();
             go('home');
         } catch (e) {
-            const invitation = new URLSearchParams(location.search).get('invitation');
-            go(invitation ? 'register' : 'login');
+            try {
+                const status = await api('/auth/status');
+                state.defaultUsername = status.defaultUsername;
+                go(status.needsSetup ? 'setup' : 'login');
+            } catch (err) {
+                go('login');
+            }
         }
     })();
 })();

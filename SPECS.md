@@ -15,11 +15,15 @@ nom, une photo optionnelle et la liste d'ingrédients sont gérés.
 
 ## 2. Utilisateurs et partage
 
-- Un **foyer** (household) regroupe plusieurs utilisateurs (typiquement 2).
-- Toutes les données (recettes, menus, listes de courses) appartiennent au foyer
-  et sont visibles/modifiables par tous ses membres.
-- Authentification par e-mail + mot de passe, ou lien magique. Un membre invite
-  l'autre via un lien d'invitation.
+- L'application est utilisée par **un seul compte partagé** par les deux
+  personnes du foyer : un identifiant (`morand` par défaut) et un mot de passe.
+- Le mot de passe est choisi au premier accès, sur un écran de première
+  utilisation, puis modifiable dans les Réglages. Aucun mot de passe n'est
+  stocké dans le code source.
+- Il n'y a ni inscription publique, ni e-mail, ni lien d'invitation : une fois
+  le compte créé, seule la connexion est possible.
+- Toutes les données (recettes, menus, listes de courses) appartiennent à ce
+  compte et sont donc communes.
 - Les modifications sont partagées : si l'un coche un ingrédient dans la liste de
   courses, l'autre voit la mise à jour (au plus tard au rafraîchissement de
   l'écran).
@@ -265,4 +269,4 @@ flowchart TD
 5. La validation d'un menu produit une liste de courses regroupant les
    ingrédients de toutes ses recettes, avec quantités additionnées par unité.
 6. La liste de courses est accessible depuis l'accueil après validation, et les
-   deux membres du foyer y accèdent avec les mêmes données.
+   deux utilisateurs du compte partagé y accèdent avec les mêmes données.

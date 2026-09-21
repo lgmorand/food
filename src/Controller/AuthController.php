@@ -12,23 +12,42 @@ use Food\Http\Response;
 
 final class AuthController
 {
-    public function register(Request $request): Response
+    public function setup(Request $request): Response
     {
-        $user = Auth::register(
-            $request->string('email'),
+        $user = Auth::setup(
             (string) $request->input('password', ''),
-            $request->string('displayName'),
-            $request->string('invitationToken') ?: null
+            $request->string('username') ?: Auth::DEFAULT_USERNAME
         );
 
         return Response::json(['user' => $user], 201);
     }
 
+    public function status(): Response
+    {
+        return Response::json([
+            'needsSetup' => Auth::needsSetup(),
+            'defaultUsername' => Auth::DEFAULT_USERNAME,
+            'authenticated' => Auth::user() !== null,
+        ]);
+    }
+
     public function login(Request $request): Response
     {
-        $user = Auth::attempt($request->string('email'), (string) $request->input('password', ''));
+        $user = Auth::attempt($request->string('username'), (string) $request->input('password', ''));
 
         return Response::json(['user' => $user]);
+    }
+
+    public function changePassword(Request $request): Response
+    {
+        $user = Auth::requireUser();
+        Auth::changePassword(
+            $user['id'],
+            (string) $request->input('currentPassword', ''),
+            (string) $request->input('newPassword', '')
+        );
+
+        return Response::noContent();
     }
 
     public function logout(): Response
@@ -51,12 +70,5 @@ final class AuthController
             'categories' => Units::CATEGORIES,
             'categoryOrder' => Units::CATEGORY_ORDER,
         ]);
-    }
-
-    public function invite(): Response
-    {
-        $householdId = Auth::requireHouseholdId();
-
-        return Response::json(Auth::createInvitation($householdId), 201);
     }
 }

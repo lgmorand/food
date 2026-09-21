@@ -7,7 +7,7 @@ pour un foyer de deux personnes.
 - Génération d'un menu de 5 ou 6 recettes sans doublon
 - Remplacement / retrait d'une recette avec nouveau tirage au hasard
 - Liste de courses agrégée par rayon à partir du menu validé
-- Partage des données entre les membres d'un même foyer (invitation)
+- Un compte unique partagé par les deux utilisateurs
 
 Les spécifications fonctionnelles sont dans [SPECS.md](SPECS.md).
 
@@ -41,16 +41,19 @@ php -S localhost:8000 -t public public/index.php
 ```
 
 La base SQLite et son schéma sont créés automatiquement au premier appel
-(`database/food.sqlite`). Ouvrez ensuite <http://localhost:8000> et créez un
-compte ; le premier compte crée son foyer.
+(`database/food.sqlite`). Ouvrez ensuite <http://localhost:8000> : au tout
+premier accès, l'application demande de choisir le mot de passe du compte
+partagé (identifiant `morand` par défaut, modifiable à ce moment-là). Ce mot de
+passe n'est écrit nulle part dans le dépôt ; il peut être changé ensuite depuis
+l'écran **Réglages**.
 
 ### Jeu de démonstration
 
 ```bash
-php bin/seed.php
+php bin/seed.php "votre-mot-de-passe" [identifiant]
 ```
 
-Crée le compte `demo@food.local` / `motdepasse1` avec 10 recettes.
+Crée le compte s'il n'existe pas encore et ajoute 10 recettes.
 
 ### Variables d'environnement
 
@@ -150,12 +153,12 @@ dépôt contient déjà l'`index.php` et le `.htaccess` nécessaires.
 ```
 bootstrap.php          autoloader, constantes, fuseau horaire
 index.php, .htaccess   entrée de secours pour un hébergement en sous-dossier
-bin/seed.php           jeu de démonstration
+bin/seed.php           compte + jeu de recettes de démarrage
 database/schema.sql    schéma SQLite
 docs/screenshots/      captures utilisées par le README
 public/                racine web : front controller, SPA, uploads
 src/Database.php       connexion PDO + migrations
-src/Auth.php           comptes, foyers, invitations
+src/Auth.php           compte unique, session, mot de passe
 src/Http/              requête, réponse, routeur, exceptions
 src/Domain/            unités, générateur de menu, agrégation des courses
 src/Repository/        accès aux données (recettes, menus, listes)

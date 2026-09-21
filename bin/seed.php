@@ -3,8 +3,9 @@
 declare(strict_types=1);
 
 /**
- * Crée un compte de démonstration avec un catalogue de recettes.
- * Usage : php bin/seed.php [email] [motdepasse]
+ * Crée le compte de l'application (s'il n'existe pas) avec un catalogue
+ * de recettes de démarrage.
+ * Usage : php bin/seed.php [motdepasse] [identifiant]
  */
 
 require __DIR__ . '/../bootstrap.php';
@@ -12,15 +13,15 @@ require __DIR__ . '/../bootstrap.php';
 use Food\Auth;
 use Food\Repository\RecipeRepository;
 
-$email = $argv[1] ?? 'demo@food.local';
-$password = $argv[2] ?? 'motdepasse1';
+$password = $argv[1] ?? 'motdepasse1';
+$username = $argv[2] ?? Auth::DEFAULT_USERNAME;
 
 $recipes = new RecipeRepository();
 
 try {
-    $user = Auth::register($email, $password, 'Démo');
+    $user = Auth::needsSetup() ? Auth::setup($password, $username) : Auth::attempt($username, $password);
 } catch (Throwable $e) {
-    echo "Impossible de créer le compte ({$e->getMessage()}).\n";
+    echo "Impossible d'accéder au compte ({$e->getMessage()}).\n";
     exit(1);
 }
 
@@ -81,8 +82,12 @@ $catalog = [
 ];
 
 foreach ($catalog as $name => $ingredients) {
-    $recipes->create($user['householdId'], ['name' => $name, 'ingredients' => $ingredients]);
-    echo "  + {$name}\n";
+    try {
+        $recipes->create($user['householdId'], ['name' => $name, 'ingredients' => $ingredients]);
+        echo "  + {$name}\n";
+    } catch (Throwable $e) {
+        echo "  = {$name} (déjà présente)\n";
+    }
 }
 
-echo "\nCompte de démonstration prêt : {$email} / {$password}\n";
+echo "\nCompte prêt : {$username}\n";

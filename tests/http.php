@@ -69,18 +69,22 @@ function check(string $name, bool $condition, string $detail = ''): void
 
 echo "Tests HTTP sur {$base}\n" . str_repeat('-', 60) . "\n";
 
-$email = 'e2e-' . bin2hex(random_bytes(4)) . '@example.com';
+$username = 'e2e' . bin2hex(random_bytes(3));
 
 $res = request('GET', '/api/auth/me');
 check('Accès non authentifié refusé', $res['status'] === 401);
 
-$res = request('POST', '/api/auth/register', [
-    'email' => $email, 'password' => 'motdepasse1', 'displayName' => 'E2E',
-]);
-check('Inscription', $res['status'] === 201 && isset($res['body']['user']['id']), (string) $res['status']);
+$res = request('GET', '/api/auth/status');
+check('Statut public disponible', $res['status'] === 200 && $res['body']['needsSetup'] === true, (string) $res['status']);
+
+$res = request('POST', '/api/auth/setup', ['username' => $username, 'password' => 'motdepasse1']);
+check('Création du compte unique', $res['status'] === 201 && isset($res['body']['user']['id']), (string) $res['status']);
+
+$res = request('POST', '/api/auth/setup', ['username' => 'autre', 'password' => 'motdepasse1']);
+check('Second compte refusé', $res['status'] === 409, (string) $res['status']);
 
 $res = request('GET', '/api/auth/me');
-check('Session active', $res['status'] === 200 && $res['body']['user']['email'] === $email);
+check('Session active', $res['status'] === 200 && $res['body']['user']['username'] === $username);
 check('Référentiels exposés', isset($res['body']['units']['kg'], $res['body']['categories']['epicerie']));
 
 $catalog = [
@@ -165,11 +169,24 @@ check('Déconnexion', $res['status'] === 204);
 $res = request('GET', '/api/recipes');
 check('Accès refusé après déconnexion', $res['status'] === 401);
 
-$res = request('POST', '/api/auth/login', ['email' => $email, 'password' => 'mauvais']);
+$res = request('POST', '/api/auth/login', ['username' => $username, 'password' => 'mauvais']);
 check('Mauvais mot de passe refusé', $res['status'] === 401);
 
-$res = request('POST', '/api/auth/login', ['email' => $email, 'password' => 'motdepasse1']);
+$res = request('POST', '/api/auth/login', ['username' => $username, 'password' => 'motdepasse1']);
 check('Reconnexion', $res['status'] === 200);
+
+$res = request('GET', '/api/auth/status');
+check('Configuration déjà faite', $res['status'] === 200 && $res['body']['needsSetup'] === false);
+
+$res = request('POST', '/api/auth/password', ['currentPassword' => 'mauvais', 'newPassword' => 'motdepasse2']);
+check('Changement de mot de passe protégé', $res['status'] === 422, (string) $res['status']);
+
+$res = request('POST', '/api/auth/password', ['currentPassword' => 'motdepasse1', 'newPassword' => 'motdepasse2']);
+check('Changement de mot de passe', $res['status'] === 204, (string) $res['status']);
+
+request('POST', '/api/auth/logout');
+$res = request('POST', '/api/auth/login', ['username' => $username, 'password' => 'motdepasse2']);
+check('Connexion avec le nouveau mot de passe', $res['status'] === 200);
 
 echo "\n" . str_repeat('-', 60) . "\n";
 @unlink($cookieJar);

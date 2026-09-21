@@ -9,18 +9,10 @@ CREATE TABLE IF NOT EXISTS households (
 CREATE TABLE IF NOT EXISTS users (
     id            TEXT PRIMARY KEY,
     household_id  TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
-    email         TEXT NOT NULL UNIQUE,
+    username      TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     display_name  TEXT NOT NULL,
     created_at    TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS invitations (
-    token        TEXT PRIMARY KEY,
-    household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
-    created_at   TEXT NOT NULL,
-    expires_at   TEXT NOT NULL,
-    used_at      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS ingredients (

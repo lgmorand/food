@@ -45,6 +45,29 @@ final class Database
             throw new RuntimeException('Schéma SQL introuvable.');
         }
         self::$pdo?->exec($schema);
+        self::upgrade();
+    }
+
+    /**
+     * Met à niveau les bases créées par une version antérieure : l'ancienne
+     * authentification par e-mail avec invitations est remplacée par un
+     * identifiant simple.
+     */
+    private static function upgrade(): void
+    {
+        $pdo = self::$pdo;
+        if (!$pdo instanceof PDO) {
+            return;
+        }
+
+        $columns = [];
+        foreach ($pdo->query('PRAGMA table_info(users)') as $column) {
+            $columns[] = $column['name'];
+        }
+        if (in_array('email', $columns, true) && !in_array('username', $columns, true)) {
+            $pdo->exec('ALTER TABLE users RENAME COLUMN email TO username');
+        }
+        $pdo->exec('DROP TABLE IF EXISTS invitations');
     }
 
     public static function reset(): void

@@ -21,11 +21,12 @@ $lists = new ShoppingListController();
 $uploads = new UploadController();
 
 // Authentification
-$router->post('/api/auth/register', static fn ($r) => $auth->register($r));
+$router->post('/api/auth/setup', static fn ($r) => $auth->setup($r));
+$router->get('/api/auth/status', static fn () => $auth->status());
 $router->post('/api/auth/login', static fn ($r) => $auth->login($r));
 $router->post('/api/auth/logout', static fn () => $auth->logout());
 $router->get('/api/auth/me', static fn () => $auth->me());
-$router->post('/api/auth/invitations', static fn () => $auth->invite());
+$router->post('/api/auth/password', static fn ($r) => $auth->changePassword($r));
 
 // Recettes
 $router->get('/api/recipes', static fn ($r) => $recipes->index($r));

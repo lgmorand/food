@@ -31,39 +31,52 @@ final class Auth
         }
     }
 
-    public static function register(string $email, string $password, string $displayName, ?string $invitationToken = null): array
+    /** Identifiant du compte créé au premier lancement. */
+    public const DEFAULT_USERNAME = 'morand';
+
+    /** Longueur minimale d'un mot de passe. */
+    private const MIN_PASSWORD_LENGTH = 8;
+
+    /**
+     * Vrai tant qu'aucun compte n'existe : l'application affiche alors
+     * l'écran de première utilisation.
+     */
+    public static function needsSetup(): bool
     {
-        $email = mb_strtolower(trim($email));
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw HttpException::badRequest('Adresse e-mail invalide.', ['email' => 'Adresse e-mail invalide.']);
-        }
-        if (mb_strlen($password) < 8) {
-            throw HttpException::badRequest('Le mot de passe doit faire au moins 8 caractères.', ['password' => 'Minimum 8 caractères.']);
-        }
-        $displayName = trim($displayName) !== '' ? trim($displayName) : ((string) strstr($email, '@', true) ?: $email);
+        return (int) Database::connection()->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0;
+    }
 
-        $pdo = Database::connection();
-        $exists = $pdo->prepare('SELECT 1 FROM users WHERE email = ?');
-        $exists->execute([$email]);
-        if ($exists->fetchColumn() !== false) {
-            throw HttpException::conflict('Un compte existe déjà avec cette adresse.');
+    /**
+     * Crée l'unique compte de l'application, puis ouvre la session.
+     */
+    public static function setup(string $password, string $username = self::DEFAULT_USERNAME, string $displayName = ''): array
+    {
+        if (!self::needsSetup()) {
+            throw HttpException::conflict('Le compte est déjà créé.');
         }
 
-        $householdId = null;
-        if ($invitationToken !== null && $invitationToken !== '') {
-            $householdId = self::consumeInvitation($invitationToken);
+        $username = self::normalizeUsername($username);
+        if ($username === '') {
+            throw HttpException::badRequest('Identifiant invalide.', ['username' => 'Identifiant requis.']);
+        }
+        if (mb_strlen($password) < self::MIN_PASSWORD_LENGTH) {
+            throw HttpException::badRequest(
+                'Le mot de passe doit faire au moins ' . self::MIN_PASSWORD_LENGTH . ' caractères.',
+                ['password' => 'Minimum ' . self::MIN_PASSWORD_LENGTH . ' caractères.']
+            );
         }
 
+        $displayName = trim($displayName) !== '' ? trim($displayName) : $username;
         $now = Support::now();
-        if ($householdId === null) {
-            $householdId = Support::uuid();
-            $pdo->prepare('INSERT INTO households (id, name, created_at) VALUES (?, ?, ?)')
-                ->execute([$householdId, 'Foyer de ' . $displayName, $now]);
-        }
+        $pdo = Database::connection();
+
+        $householdId = Support::uuid();
+        $pdo->prepare('INSERT INTO households (id, name, created_at) VALUES (?, ?, ?)')
+            ->execute([$householdId, 'Foyer ' . $displayName, $now]);
 
         $userId = Support::uuid();
-        $pdo->prepare('INSERT INTO users (id, household_id, email, password_hash, display_name, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-            ->execute([$userId, $householdId, $email, password_hash($password, PASSWORD_DEFAULT), $displayName, $now]);
+        $pdo->prepare('INSERT INTO users (id, household_id, username, password_hash, display_name, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+            ->execute([$userId, $householdId, $username, password_hash($password, PASSWORD_DEFAULT), $displayName, $now]);
 
         $user = self::findUser($userId);
         self::login($user);
@@ -71,21 +84,45 @@ final class Auth
         return $user;
     }
 
-    public static function attempt(string $email, string $password): array
+    public static function attempt(string $username, string $password): array
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = ?');
-        $stmt->execute([mb_strtolower(trim($email))]);
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE username = ?');
+        $stmt->execute([self::normalizeUsername($username)]);
         $row = $stmt->fetch();
 
         if ($row === false || !password_verify($password, $row['password_hash'])) {
-            throw HttpException::unauthorized('E-mail ou mot de passe incorrect.');
+            throw HttpException::unauthorized('Identifiant ou mot de passe incorrect.');
         }
 
         $user = self::publicUser($row);
         self::login($user);
 
         return $user;
+    }
+
+    public static function changePassword(string $userId, string $currentPassword, string $newPassword): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch();
+
+        if ($row === false || !password_verify($currentPassword, $row['password_hash'])) {
+            throw HttpException::badRequest(
+                'Mot de passe actuel incorrect.',
+                ['currentPassword' => 'Mot de passe actuel incorrect.']
+            );
+        }
+        if (mb_strlen($newPassword) < self::MIN_PASSWORD_LENGTH) {
+            throw HttpException::badRequest(
+                'Le mot de passe doit faire au moins ' . self::MIN_PASSWORD_LENGTH . ' caractères.',
+                ['newPassword' => 'Minimum ' . self::MIN_PASSWORD_LENGTH . ' caractères.']
+            );
+        }
+
+        $pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+            ->execute([password_hash($newPassword, PASSWORD_DEFAULT), $userId]);
     }
 
     public static function login(array $user): void
@@ -134,43 +171,19 @@ final class Auth
         return self::requireUser()['householdId'];
     }
 
-    public static function createInvitation(string $householdId): array
+    public static function createHousehold(string $name): string
     {
-        $token = bin2hex(random_bytes(16));
-        $now = new \DateTimeImmutable('now');
+        $householdId = Support::uuid();
         Database::connection()
-            ->prepare('INSERT INTO invitations (token, household_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
-            ->execute([
-                $token,
-                $householdId,
-                $now->format(DATE_ATOM),
-                $now->modify('+14 days')->format(DATE_ATOM),
-            ]);
+            ->prepare('INSERT INTO households (id, name, created_at) VALUES (?, ?, ?)')
+            ->execute([$householdId, $name, Support::now()]);
 
-        return ['token' => $token, 'expiresAt' => $now->modify('+14 days')->format(DATE_ATOM)];
+        return $householdId;
     }
 
-    private static function consumeInvitation(string $token): string
+    private static function normalizeUsername(string $username): string
     {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT * FROM invitations WHERE token = ?');
-        $stmt->execute([$token]);
-        $invitation = $stmt->fetch();
-
-        if ($invitation === false) {
-            throw HttpException::badRequest("Cette invitation n'existe pas.");
-        }
-        if ($invitation['used_at'] !== null) {
-            throw HttpException::badRequest('Cette invitation a déjà été utilisée.');
-        }
-        if (new \DateTimeImmutable($invitation['expires_at']) < new \DateTimeImmutable('now')) {
-            throw HttpException::badRequest('Cette invitation a expiré.');
-        }
-
-        $pdo->prepare('UPDATE invitations SET used_at = ? WHERE token = ?')
-            ->execute([Support::now(), $token]);
-
-        return $invitation['household_id'];
+        return mb_strtolower(trim($username));
     }
 
     private static function findUser(string $id): ?array
@@ -186,7 +199,7 @@ final class Auth
     {
         return [
             'id' => $row['id'],
-            'email' => $row['email'],
+            'username' => $row['username'],
             'displayName' => $row['display_name'],
             'householdId' => $row['household_id'],
         ];

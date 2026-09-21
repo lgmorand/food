@@ -25,7 +25,13 @@ final class Request
      */
     public static function detectBasePath(): string
     {
-        $script = $_SERVER['SCRIPT_NAME'] ?? '';
+        $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+        // Le serveur de développement PHP place l'URI demandée dans
+        // SCRIPT_NAME quand le fichier existe sur le disque : on ne déduit le
+        // préfixe que d'un véritable point d'entrée PHP.
+        if (!str_ends_with(strtolower($script), '.php')) {
+            return '';
+        }
         $base = rtrim(str_replace('\\', '/', dirname($script)), '/');
 
         return $base === '/' ? '' : $base;
