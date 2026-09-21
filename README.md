@@ -31,6 +31,11 @@ Les spécifications fonctionnelles sont dans [SPECS.md](SPECS.md).
 | Frontend | SPA vanilla JS + CSS, sans dépendance          |
 | Sessions | Sessions PHP natives, cookie `HttpOnly`        |
 
+Connexion protégée contre la force brute : après **5 échecs**, les tentatives
+sont bloquées pendant **1 heure**. Le compteur est tenu par identifiant *et*
+adresse IP, pour qu'une attaque extérieure ne puisse pas vous verrouiller
+vous-même ; une connexion réussie le remet à zéro.
+
 Extensions PHP requises : `pdo_sqlite`, `mbstring`, `fileinfo`, et `gd`
 (redimensionnement des photos de recettes).
 

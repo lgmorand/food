@@ -22,6 +22,10 @@ nom, une photo optionnelle et la liste d'ingrédients sont gérés.
   stocké dans le code source.
 - Il n'y a ni inscription publique, ni e-mail, ni lien d'invitation : une fois
   le compte créé, seule la connexion est possible.
+- **Protection contre la force brute** : au-delà de 5 tentatives de connexion
+  échouées, les essais suivants sont refusés pendant 1 heure (compteur tenu par
+  identifiant et adresse IP, remis à zéro par une connexion réussie). Le nombre
+  d'essais restants est indiqué à l'utilisateur.
 - Toutes les données (recettes, menus, listes de courses) appartiennent à ce
   compte et sont donc communes.
 - Les modifications sont partagées : si l'un coche un ingrédient dans la liste de

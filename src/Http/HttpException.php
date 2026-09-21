@@ -51,4 +51,9 @@ class HttpException extends RuntimeException
     {
         return new self($message, 409);
     }
+
+    public static function tooManyRequests(string $message): self
+    {
+        return new self($message, 429);
+    }
 }

@@ -458,6 +458,48 @@ $t->test('Changement d\'identifiant', function (TestRunner $t) use ($user): void
     Auth::changeUsername($user['id'], 'motdepasse1', 'testeur');
 });
 
+$t->test('Blocage après 5 échecs de connexion', function (TestRunner $t) use ($user): void {
+    $pdo = \Food\Database::connection();
+    $pdo->exec('DELETE FROM login_attempts');
+
+    for ($i = 1; $i <= 4; $i++) {
+        $t->assertThrows(
+            'incorrect',
+            static fn () => Auth::attempt('testeur', 'mauvais'),
+            "échec {$i} refusé sans blocage"
+        );
+    }
+    $t->assertSame(
+        $user['id'],
+        Auth::attempt('testeur', 'motdepasse1')['id'],
+        'une connexion réussie remet le compteur à zéro'
+    );
+
+    for ($i = 1; $i <= 5; $i++) {
+        $t->assertThrows('incorrect', static fn () => Auth::attempt('testeur', 'mauvais'), "échec {$i}");
+    }
+    $t->assertThrows(
+        'Trop de tentatives',
+        static fn () => Auth::attempt('testeur', 'mauvais'),
+        'le 6e essai est bloqué'
+    );
+    $t->assertThrows(
+        'Trop de tentatives',
+        static fn () => Auth::attempt('testeur', 'motdepasse1'),
+        'le bon mot de passe est bloqué lui aussi'
+    );
+
+    $stmt = $pdo->query('SELECT locked_until FROM login_attempts');
+    $lockedUntil = new \DateTimeImmutable((string) $stmt->fetchColumn());
+    $minutes = (int) round(($lockedUntil->getTimestamp() - time()) / 60);
+    $t->assertSame(60, $minutes, 'le blocage dure une heure');
+
+    // Le blocage expire : la connexion redevient possible.
+    $pdo->exec("UPDATE login_attempts SET locked_until = '" . (new \DateTimeImmutable('-1 minute'))->format(DATE_ATOM) . "'");
+    $t->assertSame($user['id'], Auth::attempt('testeur', 'motdepasse1')['id'], 'déblocage à expiration');
+    $t->assertSame(0, (int) $pdo->query('SELECT COUNT(*) FROM login_attempts')->fetchColumn(), 'compteur nettoyé');
+});
+
 $t->test('Rejouer un menu depuis l\'historique', function (TestRunner $t) use ($recipes, $menus): void {
     $h = Auth::createHousehold('Rejouer');
     for ($i = 1; $i <= 8; $i++) {

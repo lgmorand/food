@@ -8,6 +8,7 @@
     const state = {
         user: null,
         defaultUsername: 'morand',
+        authError: null,
         units: {},
         categories: {},
         view: 'home',
@@ -160,7 +161,7 @@
 
     function renderAuth() {
         const isSetup = state.view === 'setup';
-        const defaultUsername = state.defaultUsername || 'morand';
+        const defaultUsername = state.lastUsername || state.defaultUsername || 'morand';
 
         app.innerHTML = `
             <div class="auth-wrap">
@@ -191,24 +192,33 @@
                             ${isSetup ? 'Créer le compte' : 'Se connecter'}
                         </button>
                     </form>
+                    ${state.authError ? `<p class="auth-error" role="alert">${esc(state.authError)}</p>` : ''}
                 </div>
             </div>`;
 
         app.querySelector('#auth-form').onsubmit = async (event) => {
             event.preventDefault();
             const body = Object.fromEntries(new FormData(event.target).entries());
+            state.lastUsername = body.username;
             if (isSetup && body.password !== body.confirmation) {
-                toast('Les deux mots de passe ne correspondent pas.', true);
+                state.authError = 'Les deux mots de passe ne correspondent pas.';
+                toast(state.authError, true);
+                render();
                 return;
             }
             delete body.confirmation;
+            const button = event.target.querySelector('button[type=submit]');
+            button.disabled = true;
             try {
                 const res = await api(isSetup ? '/auth/setup' : '/auth/login', { method: 'POST', body });
+                state.authError = null;
                 state.user = res.user;
                 await bootstrapSession();
                 go('home');
             } catch (e) {
+                state.authError = e.message;
                 toast(e.message, true);
+                render();
             }
         };
     }

@@ -37,6 +37,12 @@ final class Auth
     /** Longueur minimale d'un mot de passe. */
     private const MIN_PASSWORD_LENGTH = 8;
 
+    /** Nombre d'échecs de connexion tolérés avant blocage. */
+    private const MAX_LOGIN_FAILURES = 5;
+
+    /** Durée du blocage, et fenêtre de comptage des échecs (1 heure). */
+    private const LOCK_DURATION_SECONDS = 3600;
+
     /**
      * Vrai tant qu'aucun compte n'existe : l'application affiche alors
      * l'écran de première utilisation.
@@ -86,19 +92,113 @@ final class Auth
 
     public static function attempt(string $username, string $password): array
     {
+        $username = self::normalizeUsername($username);
+        $scope = self::throttleScope($username);
+        self::assertNotLocked($scope);
+
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT * FROM users WHERE username = ?');
-        $stmt->execute([self::normalizeUsername($username)]);
+        $stmt->execute([$username]);
         $row = $stmt->fetch();
 
         if ($row === false || !password_verify($password, $row['password_hash'])) {
-            throw HttpException::unauthorized('Identifiant ou mot de passe incorrect.');
+            $remaining = self::registerFailure($scope);
+            throw HttpException::unauthorized(
+                'Identifiant ou mot de passe incorrect.'
+                . ($remaining > 0 ? " Il reste {$remaining} tentative(s) avant blocage." : '')
+            );
         }
+
+        self::clearFailures($scope);
 
         $user = self::publicUser($row);
         self::login($user);
 
         return $user;
+    }
+
+    /**
+     * Les tentatives sont comptées par identifiant *et* par adresse IP : une
+     * attaque depuis l'extérieur ne peut pas bloquer l'accès du foyer.
+     */
+    private static function throttleScope(string $username): string
+    {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'cli';
+
+        return $username . '|' . $ip;
+    }
+
+    private static function assertNotLocked(string $scope): void
+    {
+        $stmt = Database::connection()->prepare('SELECT locked_until FROM login_attempts WHERE scope = ?');
+        $stmt->execute([$scope]);
+        $lockedUntil = $stmt->fetchColumn();
+
+        if (!is_string($lockedUntil) || $lockedUntil === '') {
+            return;
+        }
+
+        $until = new \DateTimeImmutable($lockedUntil);
+        if ($until <= new \DateTimeImmutable('now')) {
+            self::clearFailures($scope);
+
+            return;
+        }
+
+        $minutes = max(1, (int) ceil(($until->getTimestamp() - time()) / 60));
+        throw HttpException::tooManyRequests(
+            "Trop de tentatives échouées. Réessayez dans {$minutes} minute(s)."
+        );
+    }
+
+    /** Retourne le nombre de tentatives restantes avant blocage. */
+    private static function registerFailure(string $scope): int
+    {
+        $pdo = Database::connection();
+        $now = new \DateTimeImmutable('now');
+
+        $stmt = $pdo->prepare('SELECT * FROM login_attempts WHERE scope = ?');
+        $stmt->execute([$scope]);
+        $row = $stmt->fetch();
+
+        $failures = 1;
+        $firstFailureAt = $now;
+        if ($row !== false) {
+            $firstFailureAt = new \DateTimeImmutable($row['first_failure_at']);
+            // Les échecs plus anciens que la fenêtre de blocage sont oubliés.
+            if ($firstFailureAt->getTimestamp() + self::LOCK_DURATION_SECONDS > $now->getTimestamp()) {
+                $failures = (int) $row['failures'] + 1;
+            } else {
+                $firstFailureAt = $now;
+            }
+        }
+
+        $lockedUntil = $failures >= self::MAX_LOGIN_FAILURES
+            ? $now->modify('+' . self::LOCK_DURATION_SECONDS . ' seconds')->format(DATE_ATOM)
+            : null;
+
+        $pdo->prepare(
+            'INSERT INTO login_attempts (scope, failures, first_failure_at, last_failure_at, locked_until)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(scope) DO UPDATE SET
+                failures = excluded.failures,
+                first_failure_at = excluded.first_failure_at,
+                last_failure_at = excluded.last_failure_at,
+                locked_until = excluded.locked_until'
+        )->execute([
+            $scope,
+            $failures,
+            $firstFailureAt->format(DATE_ATOM),
+            $now->format(DATE_ATOM),
+            $lockedUntil,
+        ]);
+
+        return max(0, self::MAX_LOGIN_FAILURES - $failures);
+    }
+
+    private static function clearFailures(string $scope): void
+    {
+        Database::connection()->prepare('DELETE FROM login_attempts WHERE scope = ?')->execute([$scope]);
     }
 
     public static function changePassword(string $userId, string $currentPassword, string $newPassword): void

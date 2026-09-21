@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS users (
     created_at    TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS login_attempts (
+    scope            TEXT PRIMARY KEY,
+    failures         INTEGER NOT NULL DEFAULT 0,
+    first_failure_at TEXT NOT NULL,
+    last_failure_at  TEXT NOT NULL,
+    locked_until     TEXT
+);
+
 CREATE TABLE IF NOT EXISTS ingredients (
     id           TEXT PRIMARY KEY,
     household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
