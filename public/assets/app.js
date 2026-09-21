@@ -659,10 +659,23 @@
             });
         };
 
+        // Le formulaire est réaffiché à chaque ajout de ligne, d'où la
+        // sauvegarde préalable de la saisie en cours dans l'état.
+        const syncForm = () => {
+            const nameInput = app.querySelector('#name');
+            if (!nameInput) return;
+            recipe.name = nameInput.value;
+            recipe.tags = app.querySelector('#tags').value.split(',').map((t) => t.trim()).filter(Boolean);
+            recipe.isActive = app.querySelector('#isActive').checked;
+            syncLines();
+            state.data.draftLines = lines;
+        };
+
         app.querySelectorAll('.ingredient-line .remove').forEach((btn) => {
             btn.onclick = () => {
-                syncLines();
-                lines.splice(Number(btn.closest('.ingredient-line').dataset.index), 1);
+                const index = Number(btn.closest('.ingredient-line').dataset.index);
+                syncForm();
+                lines.splice(index, 1);
                 render();
             };
         });
@@ -679,7 +692,7 @@
         });
 
         app.querySelector('#add-line').onclick = () => {
-            syncLines();
+            syncForm();
             lines.push({ name: '', quantity: '', unit: null });
             state.data.draftLines = lines;
             render();
@@ -690,6 +703,7 @@
         const photoInput = app.querySelector('#photo');
         photoInput.onchange = () => {
             if (!photoInput.files || !photoInput.files[0]) return;
+            syncForm();
             withLoader(async () => {
                 const form = new FormData();
                 form.append('photo', photoInput.files[0]);
@@ -700,15 +714,15 @@
         };
 
         const removePhoto = app.querySelector('#remove-photo');
-        if (removePhoto) removePhoto.onclick = () => { recipe.photoUrl = null; render(); };
+        if (removePhoto) removePhoto.onclick = () => { syncForm(); recipe.photoUrl = null; render(); };
 
         app.querySelector('#save').onclick = () => {
-            syncLines();
+            syncForm();
             const payload = {
-                name: app.querySelector('#name').value.trim(),
+                name: (recipe.name || '').trim(),
                 photoUrl: recipe.photoUrl,
-                isActive: app.querySelector('#isActive').checked,
-                tags: app.querySelector('#tags').value.split(',').map((t) => t.trim()).filter(Boolean),
+                isActive: recipe.isActive,
+                tags: recipe.tags,
                 ingredients: lines
                     .filter((line) => (line.name || '').trim() !== '')
                     .map((line) => ({

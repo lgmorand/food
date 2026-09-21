@@ -80,19 +80,17 @@ final class UploadController
         if ($scale < 1.0) {
             $resized = imagescale($image, (int) round($width * $scale), (int) round($height * $scale));
             if ($resized !== false) {
-                imagedestroy($image);
                 $image = $resized;
             }
         }
 
-        $ok = match ($mime) {
+        // Pas d'imagedestroy() : sans effet depuis PHP 8.0 et déprécié en 8.5,
+        // la ressource est libérée par le ramasse-miettes.
+        return match ($mime) {
             'image/jpeg' => imagejpeg($image, $target, 82),
             'image/png' => imagepng($image, $target, 6),
             'image/webp' => imagewebp($image, $target, 82),
             default => false,
         };
-        imagedestroy($image);
-
-        return $ok;
     }
 }
