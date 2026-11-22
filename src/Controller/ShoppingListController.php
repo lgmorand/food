@@ -8,12 +8,14 @@ use Food\Auth;
 use Food\Http\HttpException;
 use Food\Http\Request;
 use Food\Http\Response;
+use Food\Integration\TodoistClient;
 use Food\Repository\ShoppingListRepository;
 
 final class ShoppingListController
 {
     public function __construct(
         private readonly ShoppingListRepository $lists = new ShoppingListRepository(),
+        private readonly TodoistClient $todoist = new TodoistClient(),
     ) {
     }
 
@@ -80,5 +82,23 @@ final class ShoppingListController
         }
 
         return Response::json(['text' => $this->lists->toText($list)]);
+    }
+
+    public function todoistStatus(): Response
+    {
+        Auth::requireHouseholdId();
+
+        return Response::json($this->todoist->configuration());
+    }
+
+    public function pushToTodoist(Request $request, array $args): Response
+    {
+        $list = $this->lists->find(Auth::requireHouseholdId(), $args['id']);
+        $created = $this->todoist->push($list);
+
+        return Response::json([
+            'createdCount' => $created,
+            'message' => "{$created} article(s) envoyé(s) à Todoist.",
+        ]);
     }
 }

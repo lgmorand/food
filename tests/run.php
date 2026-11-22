@@ -13,10 +13,13 @@ putenv('FOOD_DB_PATH=' . $dbPath);
 require __DIR__ . '/../bootstrap.php';
 
 use Food\Auth;
+use Food\Controller\ShoppingListController;
 use Food\Database;
 use Food\Domain\MenuGenerator;
 use Food\Domain\Units;
 use Food\Http\HttpException;
+use Food\Http\Request;
+use Food\Integration\TodoistClient;
 use Food\Repository\IngredientRepository;
 use Food\Repository\MenuRepository;
 use Food\Repository\RecipeRepository;
@@ -658,6 +661,153 @@ $t->test('Publication dans un sous-dossier', function (TestRunner $t): void {
     $t->assertSame('/assets/app.js', $statique->path, 'chemin du fichier statique inchangé');
 
     unset($_SERVER['SCRIPT_NAME'], $_SERVER['REQUEST_URI'], $_SERVER['REQUEST_METHOD']);
+});
+
+$todoistList = [
+    'weekStart' => '2026-11-23',
+    'groups' => [
+        ['label' => 'Épicerie', 'items' => [
+            ['label' => 'Riz', 'display' => '500 g + 2 pièces', 'checked' => false, 'isManual' => false],
+        ]],
+        ['label' => 'Entretien', 'items' => [
+            ['label' => 'Sacs poubelle', 'display' => '', 'checked' => true, 'isManual' => true],
+        ]],
+    ],
+];
+
+function todoistSuccess(string $body): array
+{
+    parse_str($body, $form);
+    $statuses = [];
+    foreach (json_decode($form['commands'], true, 512, JSON_THROW_ON_ERROR) as $command) {
+        $statuses[$command['uuid']] = 'ok';
+    }
+
+    return ['status' => 200, 'body' => json_encode(['sync_status' => $statuses], JSON_THROW_ON_ERROR)];
+}
+
+$t->test('Todoist : push de tous les articles sans lecture ni modification locale', function (TestRunner $t) use ($todoistList): void {
+    $requests = [];
+    $client = new TodoistClient('test-token', 'shared-project', static function ($url, $headers, $body) use (&$requests): array {
+        $requests[] = [$url, $headers, $body];
+
+        return todoistSuccess($body);
+    });
+    $before = $todoistList;
+    $t->assertSame(2, $client->push($todoistList), 'les articles cochés et manuels sont aussi envoyés');
+    $t->assertSame(1, count($requests), 'un seul appel pour la liste');
+    $t->assertSame('https://api.todoist.com/api/v1/sync', $requests[0][0], 'API v1');
+    $t->assert(in_array('Authorization: Bearer test-token', $requests[0][1], true), 'authentification côté serveur');
+    parse_str($requests[0][2], $form);
+    $t->assertSame(['commands'], array_keys($form), 'aucune ressource distante demandée');
+    $commands = json_decode($form['commands'], true, 512, JSON_THROW_ON_ERROR);
+    $t->assertSame(['item_add', 'item_add'], array_column($commands, 'type'), 'uniquement des créations');
+    $t->assertSame('shared-project', $commands[0]['args']['project_id'], 'projet partagé destinataire');
+    $t->assertSame('Riz — 500 g + 2 pièces', $commands[0]['args']['content'], 'quantités conservées');
+    $t->assertSame('Sacs poubelle', $commands[1]['args']['content'], 'article libre sans quantité');
+    $t->assertSame("Food — semaine du 2026-11-23\nRayon : Épicerie", $commands[0]['args']['description'], 'contexte conservé');
+    $t->assertSame($before, $todoistList, 'liste locale inchangée');
+    $t->assertSame(2, $client->push($todoistList), 'un nouvel envoi est autorisé');
+    parse_str($requests[1][2], $nextForm);
+    $next = json_decode($nextForm['commands'], true, 512, JSON_THROW_ON_ERROR);
+    $t->assertSame([], array_intersect(array_column($commands, 'uuid'), array_column($next, 'uuid')), 'nouvel envoi sans dédoublonnage');
+});
+
+$t->test('Todoist : configuration manquante et liste vide sans appel distant', function (TestRunner $t) use ($todoistList): void {
+    $calls = 0;
+    $transport = static function () use (&$calls): array {
+        $calls++;
+        throw new RuntimeException('Aucun appel attendu');
+    };
+    $t->assertThrows('FOOD_TODOIST_TOKEN', static fn () => (new TodoistClient('', 'project', $transport))->push($todoistList), 'clé manquante');
+    $t->assertThrows('FOOD_TODOIST_PROJECT_ID', static fn () => (new TodoistClient('test-token', '', $transport))->push($todoistList), 'projet manquant');
+    $client = new TodoistClient('test-token', 'project', $transport);
+    $t->assertThrows('vide', static fn () => $client->push(['weekStart' => '', 'groups' => []]), 'liste vide refusée');
+    $t->assertSame(0, $calls, 'pas de requête inutile');
+    $t->assert(!str_contains(json_encode($client->configuration()), 'test-token'), 'clé jamais exposée');
+});
+
+$t->test('Todoist : refus HTTP et transport sans nouvel essai', function (TestRunner $t) use ($todoistList): void {
+    foreach ([401 => 'Clé API', 403 => 'ne peut pas', 404 => 'introuvable', 429 => 'Limite', 500 => 'peut-être', 0 => 'peut-être'] as $status => $message) {
+        $calls = 0;
+        $client = new TodoistClient('test-token', 'project', static function () use ($status, &$calls): array {
+            $calls++;
+
+            return ['status' => $status, 'body' => ''];
+        });
+        $t->assertThrows($message, static fn () => $client->push($todoistList), "échec HTTP {$status} explicite");
+        $t->assertSame(1, $calls, 'aucun rejeu automatique');
+    }
+});
+
+$t->test('Todoist : succès HTTP insuffisant si une création échoue ou manque', function (TestRunner $t) use ($todoistList): void {
+    foreach (['rejected', 'missing', 'invalid'] as $mode) {
+        $client = new TodoistClient('test-token', 'project', static function ($url, $headers, $body) use ($mode): array {
+            if ($mode === 'invalid') {
+                return ['status' => 200, 'body' => '<html>Erreur</html>'];
+            }
+            $response = todoistSuccess($body);
+            $payload = json_decode($response['body'], true);
+            $second = array_keys($payload['sync_status'])[1];
+            if ($mode === 'missing') {
+                unset($payload['sync_status'][$second]);
+            } else {
+                $payload['sync_status'][$second] = ['error_code' => 20, 'error' => 'Invalid project'];
+            }
+
+            return ['status' => 200, 'body' => json_encode($payload)];
+        });
+        $t->assertThrows($mode === 'invalid' ? 'Réponse Todoist invalide' : '1 / 2', static fn () => $client->push($todoistList), 'pas de faux succès');
+        if ($mode !== 'rejected') {
+            $t->assertThrows('peut-être', static fn () => $client->push($todoistList), 'confirmation incertaine signalée');
+        }
+    }
+});
+
+$t->test('Todoist : limite de 100 commandes et arrêt après un refus partiel', function (TestRunner $t) use ($todoistList): void {
+    $large = $todoistList;
+    $large['groups'] = [['label' => 'Épicerie', 'items' => array_fill(0, 201, $todoistList['groups'][0]['items'][0])]];
+    $sizes = [];
+    $client = new TodoistClient('test-token', 'project', static function ($url, $headers, $body) use (&$sizes): array {
+        parse_str($body, $form);
+        $sizes[] = count(json_decode($form['commands'], true));
+
+        return todoistSuccess($body);
+    });
+    $t->assertSame(201, $client->push($large), 'tous les articles envoyés');
+    $t->assertSame([100, 100, 1], $sizes, 'limite Todoist respectée');
+    $calls = 0;
+    $client = new TodoistClient('test-token', 'project', static function ($url, $headers, $body) use (&$calls): array {
+        $calls++;
+
+        return $calls === 1 ? todoistSuccess($body) : ['status' => 403, 'body' => ''];
+    });
+    $t->assertThrows('100 / 201', static fn () => $client->push($large), 'créations du premier lot signalées');
+    $t->assertSame(2, $calls, 'pas de troisième lot après échec');
+});
+
+$t->test('Todoist : endpoint protégé et liste locale conservée', function (TestRunner $t) use ($user, $household, $menus, $lists): void {
+    $calls = 0;
+    $client = new TodoistClient('test-token', 'project', static function ($url, $headers, $body) use (&$calls): array {
+        $calls++;
+
+        return todoistSuccess($body);
+    });
+    $controller = new ShoppingListController($lists, $client);
+    $request = new Request('POST', '/api/shopping-lists/test/todoist', []);
+    Auth::logout();
+    $t->assertThrows('Authentification', static fn () => $controller->todoistStatus(), 'configuration protégée');
+    $t->assertThrows('Authentification', static fn () => $controller->pushToTodoist($request, ['id' => 'test']), 'push protégé');
+    Auth::login($user);
+    $t->assertThrows('introuvable', static fn () => $controller->pushToTodoist($request, ['id' => 'test']), 'liste inconnue refusée');
+    $t->assertSame(0, $calls, 'aucun envoi non autorisé');
+    $menu = $menus->validate($household, $menus->generate($household, 5, '2027-05-03')['id']);
+    $list = $lists->generateForMenu($household, $menu['id']);
+    $list = $lists->toggleItem($household, $list['id'], $list['groups'][0]['items'][0]['id'], true);
+    $response = $controller->pushToTodoist($request, ['id' => $list['id']]);
+    $t->assertSame(200, $response->status, 'succès de l’endpoint');
+    $t->assertSame($list['totalCount'], $response->payload['createdCount'], 'nombre de créations confirmé');
+    $t->assertSame($list, $lists->find($household, $list['id']), 'coches et contenu inchangés en base');
 });
 
 $exit = $t->summary();
