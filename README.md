@@ -38,6 +38,7 @@ vous-même ; une connexion réussie le remet à zéro.
 
 Extensions PHP requises : `pdo_sqlite`, `mbstring`, `fileinfo`, et `gd`
 (redimensionnement des photos de recettes).
+L'intégration Todoist nécessite aussi `curl`.
 
 ## Installation et lancement
 
@@ -93,6 +94,48 @@ L'identifiant du compte peut aussi être modifié depuis cet écran.
 |--------------------|-----------------------|-------------------------------|
 | `FOOD_DB_PATH`     | `database/food.sqlite`| Chemin du fichier SQLite      |
 | `FOOD_UPLOAD_DIR`  | `public/uploads`      | Dossier des photos de recettes|
+| `FOOD_TODOIST_TOKEN` | Aucun | Clé API personnelle Todoist, conservée uniquement sur le serveur |
+| `FOOD_TODOIST_PROJECT_ID` | Aucun | Identifiant du projet Todoist partagé destinataire |
+
+### Envoyer les courses à Todoist
+
+L'intégration est facultative : sans configuration, les courses fonctionnent
+normalement et le bouton **Envoyer à Todoist** reste désactivé.
+
+Quand vous aurez la clé :
+
+1. Créez un projet dans Todoist et partagez-le avec l'autre personne.
+2. Récupérez votre clé API dans les réglages Todoist, rubrique **Intégrations**.
+3. Récupérez l'identifiant du projet (pas son nom) dans son URL web :
+   `https://app.todoist.com/app/project/<nom>-<identifiant>`. Utilisez l'identifiant
+   réel du projet, pas un identifiant temporaire commençant par `tmp-`.
+4. Définissez `FOOD_TODOIST_TOKEN` et `FOOD_TODOIST_PROJECT_ID` dans
+   l'environnement du serveur PHP, puis redémarrez-le si nécessaire.
+   Le compte associé à la clé doit pouvoir ajouter des tâches au projet.
+   Ces variables ne sont pas des secrets GitHub Actions : elles doivent être
+   configurées chez l'hébergeur. Ne mettez jamais la clé dans le dépôt ou le JS.
+
+Depuis une liste prête, **Envoyer à Todoist** ajoute une tâche par article,
+**y compris les articles cochés**, avec les quantités dans le titre et le
+rayon/la semaine dans la description. Les nouvelles tâches sont non cochées.
+La liste Food reste inchangée. L'application affiche le nombre de créations
+confirmées par Todoist et ne déclare le succès que si chaque création est acceptée.
+
+Il s'agit d'un **push ponctuel**, pas d'une synchronisation : aucune lecture,
+comparaison, mise à jour ou suppression des tâches existantes. Chaque nouvel
+envoi ajoute à nouveau toute la liste et peut donc créer des doublons.
+Les écritures ne sont jamais rejouées automatiquement. Une coupure peut laisser
+un résultat incertain ; un refus partiel affiche le nombre de créations
+confirmées, sans annuler les tâches déjà créées.
+
+Côté API (session requise) : `GET /api/todoist/status` expose uniquement
+l'état de configuration, jamais la clé, et
+`POST /api/shopping-lists/{id}/todoist` envoie les articles du foyer connecté.
+Le backend utilise l'[API Todoist v1](https://developer.todoist.com/api/v1/),
+avec des commandes de création groupées (100 maximum par requête), sans
+demander de ressources distantes.
+
+Food n'est pas créé par, affilié à, ni soutenu par Todoist.
 
 ## Tests
 

@@ -16,6 +16,8 @@
         data: {},
         menuSize: Number(localStorage.getItem('food.menuSize') || 5),
         loading: false,
+        todoistSending: false,
+        todoistResult: null,
         stack: [],
     };
 
@@ -141,12 +143,19 @@
                     : { name: '', photoUrl: null, isActive: true, tags: [], ingredients: [] };
                 state.data.draftLines = state.data.recipe.ingredients.map((i) => ({ ...i }));
             } else if (state.view === 'shopping') {
-                state.data.shoppingList = state.params.id
-                    ? (await api('/shopping-lists/' + state.params.id)).shoppingList
-                    : (await api('/shopping-list/current')).shoppingList;
+                const [res, todoist] = await Promise.all([
+                    api(state.params.id ? '/shopping-lists/' + state.params.id : '/shopping-list/current'),
+                    api('/todoist/status'),
+                ]);
+                state.data.shoppingList = res.shoppingList;
+                state.data.todoist = todoist;
             } else if (state.view === 'history') {
                 state.data.history = (await api('/menus/history')).menus;
-            } else if (state.view === 'catalog' || state.view === 'settings') {
+            } else if (state.view === 'settings') {
+                const [res, todoist] = await Promise.all([api('/ingredients'), api('/todoist/status')]);
+                state.data.ingredients = res.ingredients;
+                state.data.todoist = todoist;
+            } else if (state.view === 'catalog') {
                 state.data.ingredients = (await api('/ingredients')).ingredients;
             }
         } catch (e) {
@@ -420,6 +429,8 @@
         }
 
         const progress = list.totalCount ? Math.round((list.checkedCount / list.totalCount) * 100) : 0;
+        const todoist = state.data.todoist;
+        const result = state.todoistResult?.listId === list.id ? state.todoistResult : null;
 
         app.innerHTML = topbar('Liste de courses', formatWeek(list.weekStart), true) + `
             <div class="screen">
@@ -431,6 +442,18 @@
                         <button class="btn-ghost btn-sm" id="share">Partager</button>
                     </div>
                     <div class="progress"><span style="width:${progress}%"></span></div>
+                </div>
+                <div class="card">
+                    <button class="btn-secondary btn-block" id="todoist-push"
+                            ${!todoist?.configured || !list.totalCount || state.todoistSending ? 'disabled' : ''}>
+                        ${state.todoistSending ? 'Envoi en cours…' : 'Envoyer à Todoist'}
+                    </button>
+                    <p class="muted">Tous les articles, même cochés, seront ajoutés comme nouvelles tâches.
+                       Aucun rapprochement : un nouvel envoi crée des doublons.</p>
+                    ${todoist && !todoist.configured
+                        ? '<p class="muted">Todoist n’est pas encore configuré.</p><button class="btn-ghost btn-block" id="todoist-settings">Voir les réglages</button>'
+                        : ''}
+                    <p role="status" aria-live="polite">${result ? esc(result.message) : ''}</p>
                 </div>
 
                 ${list.groups.map((group) => `
@@ -465,6 +488,30 @@
                 </form>
             </div>` + tabbar('shopping');
         bindChrome();
+
+        const todoistSettings = app.querySelector('#todoist-settings');
+        if (todoistSettings) todoistSettings.onclick = () => go('settings');
+        app.querySelector('#todoist-push').onclick = async () => {
+            if (state.todoistSending || !todoist?.configured || !list.totalCount) return;
+            if (!window.confirm(`Envoyer les ${list.totalCount} articles à Todoist ? Les tâches existantes ne seront pas vérifiées ; un nouvel envoi créera des doublons.`)) return;
+            state.todoistSending = true;
+            state.todoistResult = null;
+            render();
+            try {
+                const res = await api(`/shopping-lists/${list.id}/todoist`, { method: 'POST' });
+                state.todoistResult = { listId: list.id, message: res.message };
+                toast(res.message);
+            } catch (e) {
+                const message = e.status === 0
+                    ? 'Confirmation perdue. Des tâches ont peut-être été créées dans Todoist ; un nouvel envoi peut créer des doublons.'
+                    : e.message;
+                state.todoistResult = { listId: list.id, message };
+                toast(message, true);
+            } finally {
+                state.todoistSending = false;
+                render();
+            }
+        };
 
         app.querySelectorAll('.shop-item').forEach((row) => {
             const itemId = row.dataset.id;
@@ -840,6 +887,17 @@
                     <h2 style="margin-top:0">Ingrédients</h2>
                     <p class="muted">${(state.data.ingredients || []).length} ingrédient(s) au référentiel.</p>
                     <button class="btn-ghost btn-block" id="go-catalog">Gérer les ingrédients</button>
+                </div>
+                <div class="card">
+                    <h2 style="margin-top:0">Todoist</h2>
+                    <p class="muted">${state.data.todoist
+                        ? (state.data.todoist.configured ? 'Configuration prête pour l’envoi.' : 'Configuration à compléter sur le serveur.')
+                        : 'Chargement de la configuration…'}</p>
+                    <p class="muted">Renseignez les variables d’environnement <code>FOOD_TODOIST_TOKEN</code>
+                       (clé API) et <code>FOOD_TODOIST_PROJECT_ID</code> (identifiant du projet partagé).
+                       La clé reste sur le serveur et n’est jamais envoyée au navigateur.</p>
+                    <p class="muted">Le bouton « Envoyer à Todoist » de la liste de courses ajoute tous les articles,
+                       y compris ceux cochés. Aucune tâche existante n’est lue, modifiée ou supprimée.</p>
                 </div>
                 <div class="card">
                     <h2 style="margin-top:0">Sauvegarde</h2>

@@ -64,10 +64,12 @@ $router->put('/api/menus/{id}/items/{position}', static fn ($r, $a) => $menus->a
 $router->delete('/api/menus/{id}/items/{position}', static fn ($r, $a) => $menus->removeItem($r, $a));
 
 // Liste de courses
+$router->get('/api/todoist/status', static fn () => $lists->todoistStatus());
 $router->get('/api/shopping-list/current', static fn () => $lists->current());
 $router->get('/api/shopping-lists/by-menu/{menuId}', static fn ($r, $a) => $lists->forMenu($r, $a));
 $router->get('/api/shopping-lists/{id}', static fn ($r, $a) => $lists->show($r, $a));
 $router->get('/api/shopping-lists/{id}/export', static fn ($r, $a) => $lists->export($r, $a));
+$router->post('/api/shopping-lists/{id}/todoist', static fn ($r, $a) => $lists->pushToTodoist($r, $a));
 $router->post('/api/shopping-lists/{id}/items', static fn ($r, $a) => $lists->addItem($r, $a));
 $router->post('/api/shopping-lists/{id}/uncheck-all', static fn ($r, $a) => $lists->uncheckAll($r, $a));
 $router->patch('/api/shopping-lists/{id}/items/{itemId}', static fn ($r, $a) => $lists->toggleItem($r, $a));

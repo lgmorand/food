@@ -74,6 +74,11 @@ $username = 'e2e' . bin2hex(random_bytes(3));
 $res = request('GET', '/api/auth/me');
 check('Accès non authentifié refusé', $res['status'] === 401);
 
+$res = request('GET', '/api/todoist/status');
+check('Configuration Todoist protégée', $res['status'] === 401);
+$res = request('POST', '/api/shopping-lists/test/todoist');
+check('Envoi Todoist protégé', $res['status'] === 401);
+
 $res = request('GET', '/api/auth/status');
 check('Statut public disponible', $res['status'] === 200 && $res['body']['needsSetup'] === true, (string) $res['status']);
 
@@ -143,6 +148,16 @@ check('Liste groupée par rayon', count($list['groups']) > 1);
 
 $res = request('GET', '/api/shopping-list/current');
 check('Liste courante accessible', $res['body']['shoppingList']['id'] === $list['id']);
+
+$res = request('GET', '/api/todoist/status');
+check(
+    'État Todoist sans clé exposée',
+    $res['status'] === 200 && array_keys($res['body']) === ['configured', 'missing']
+);
+if (($res['body']['configured'] ?? true) === false) {
+    $res = request('POST', "/api/shopping-lists/{$list['id']}/todoist");
+    check('Envoi non configuré refusé explicitement', $res['status'] === 409 && str_contains($res['body']['message'] ?? '', 'non configuré'));
+}
 
 $itemId = $list['groups'][0]['items'][0]['id'];
 $res = request('PATCH', "/api/shopping-lists/{$list['id']}/items/{$itemId}", ['checked' => true]);
